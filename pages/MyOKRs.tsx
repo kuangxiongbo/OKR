@@ -401,10 +401,10 @@ export const MyOKRs: React.FC = () => {
     const handlePasteScreenshot: React.ClipboardEventHandler<HTMLDivElement> = async (e) => {
         const items = e.clipboardData?.items;
         if (!items) return;
-        const imageItems = Array.from(items).filter((item) => item.type.startsWith('image/'));
+        const imageItems = Array.from(items).filter((item: DataTransferItem) => item.type.startsWith('image/'));
         if (imageItems.length === 0) return;
         e.preventDefault();
-        for (const imageItem of imageItems) {
+        for (const imageItem of imageItems as DataTransferItem[]) {
             const file = imageItem.getAsFile();
             if (file) {
                 await handlePickImportFile(file);
@@ -520,15 +520,11 @@ export const MyOKRs: React.FC = () => {
         ];
 
         const company = allOKRs.filter(o => activeStatuses.includes(o.status) && o.level === OKRLevel.COMPANY);
-        let dept = [];
-
-        if (localOKR.level === OKRLevel.PERSONAL) {
-             dept = allOKRs.filter(o => 
-                activeStatuses.includes(o.status) &&
-                o.level === OKRLevel.DEPARTMENT && 
-                o.department === user.department
-            );
-        }
+        const dept = allOKRs.filter(o => 
+            activeStatuses.includes(o.status) &&
+            o.level === OKRLevel.DEPARTMENT &&
+            o.id !== localOKR.id
+        );
 
         return { company, dept };
     }, [allOKRs, localOKR, user.department]);
@@ -1054,7 +1050,7 @@ export const MyOKRs: React.FC = () => {
                                     className="hidden"
                                     accept="image/*,.txt,.md,.csv,.json,.pdf,.ppt,.pptx,application/pdf,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
                                     onChange={async e => {
-                                        const files = Array.from(e.target.files || []);
+                                        const files = Array.from(e.target.files || []) as File[];
                                         for (const f of files) {
                                             await handlePickImportFile(f);
                                         }

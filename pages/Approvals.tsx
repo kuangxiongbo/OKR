@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { getOKRs, updateOKRStatus, getApproverRoles, getUsers, saveOKR } from '../services/okrService';
 import { useCurrentUser } from '../hooks/useCurrentUser';
 import { OKR, OKRStatus, Role, ROLE_NAMES, User, FinalGrade } from '../types';
-import { Check, X, Workflow, ShieldAlert, Users, MessageSquare, FileText, ClipboardList, Send, Copy, MessageCircle, Clock } from 'lucide-react';
+import { Check, X, Workflow, ShieldAlert, Users, MessageSquare, FileText, ClipboardList, Send, Copy, MessageCircle, Clock, Calendar, Search } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 
 export const Approvals: React.FC = () => {
@@ -13,6 +13,9 @@ export const Approvals: React.FC = () => {
     const [feedbackItems, setFeedbackItems] = useState<OKR[]>([]);
     const [activeTab, setActiveTab] = useState<'WORKFLOW' | 'FEEDBACK'>('WORKFLOW');
     const [allUsers, setAllUsers] = useState<User[]>([]);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [selectedOKR, setSelectedOKR] = useState<OKR | null>(null);
+    const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
     // Dialog State
     const [dialog, setDialog] = useState<{
@@ -85,6 +88,37 @@ export const Approvals: React.FC = () => {
         setPending(workflowItems);
         setFeedbackItems(feedbackList);
     }
+
+    const filteredPending = pending.filter(okr => {
+        if (!searchTerm.trim()) return true;
+        const lowTerm = searchTerm.toLowerCase();
+        
+        const nameMatches = okr.userName.toLowerCase().includes(lowTerm);
+        const departmentMatches = okr.department?.toLowerCase().includes(lowTerm);
+        const objectiveMatches = okr.objectives.some(obj => 
+            obj.content.toLowerCase().includes(lowTerm) ||
+            obj.keyResults.some(kr => kr.content.toLowerCase().includes(lowTerm))
+        );
+        
+        return nameMatches || departmentMatches || objectiveMatches;
+    });
+
+    const filteredFeedbackItems = feedbackItems.filter(okr => {
+        if (!searchTerm.trim()) return true;
+        const lowTerm = searchTerm.toLowerCase();
+        const nameMatches = okr.userName.toLowerCase().includes(lowTerm);
+        const departmentMatches = okr.department?.toLowerCase().includes(lowTerm);
+        const objectiveMatches = okr.objectives.some(obj => 
+            obj.content.toLowerCase().includes(lowTerm) ||
+            obj.keyResults.some(kr => kr.content.toLowerCase().includes(lowTerm))
+        );
+        return nameMatches || departmentMatches || objectiveMatches;
+    });
+
+    const openDetails = (okr: OKR) => {
+        setSelectedOKR(okr);
+        setIsDetailsOpen(true);
+    };
 
     useEffect(() => {
         refreshData();
@@ -167,6 +201,17 @@ export const Approvals: React.FC = () => {
                 <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-3">
                     <Check /> 审批与建议中心
                 </h1>
+                
+                <div className="relative w-72">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <input 
+                        type="text" 
+                        placeholder="搜索姓名、部门、O/KR 内容..."
+                        className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500/20 active:outline-none focus:outline-none transition-all"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                </div>
             </div>
 
             {/* Tabs */}
@@ -206,7 +251,7 @@ export const Approvals: React.FC = () => {
                         </h3>
                         {pending.length === 0 && <p className="text-slate-400 italic text-sm ml-6 mb-6">暂无定稿申请。</p>}
                         <div className="space-y-4">
-                            {pending.map(okr => (
+                            {filteredPending.map(okr => (
                                 <ApprovalCard
                                     key={okr.id}
                                     okr={okr}
@@ -214,6 +259,7 @@ export const Approvals: React.FC = () => {
                                     allUsers={allUsers}
                                     onApprove={() => handleApproveCreation(okr)}
                                     onReject={() => handleReject(okr)}
+                                    onDetails={() => openDetails(okr)}
                                 />
                             ))}
                         </div>
@@ -227,8 +273,8 @@ export const Approvals: React.FC = () => {
                         <MessageSquare size={16} className="text-indigo-500" />
                         <span>以下为您受邀在「制定阶段」协作或「抄送」的 OKR。您可以提供建议以帮助负责人完善目标。</span>
                     </div>
-                    {feedbackItems.length === 0 && <div className="text-center py-10 text-slate-400">暂无相关记录。</div>}
-                    {feedbackItems.map(okr => (
+                    {filteredFeedbackItems.length === 0 && <div className="text-center py-10 text-slate-400">暂无相关记录。</div>}
+                    {filteredFeedbackItems.map(okr => (
                         <FeedbackCard
                             key={okr.id}
                             okr={okr}
@@ -238,13 +284,135 @@ export const Approvals: React.FC = () => {
                     ))}
                 </div>
             )}
+
+            {isDetailsOpen && selectedOKR && (
+                <ApprovalDetailModal 
+                    okr={selectedOKR} 
+                    allUsers={allUsers}
+                    onClose={() => setIsDetailsOpen(false)}
+                    onApprove={() => {
+                        handleApproveCreation(selectedOKR);
+                        setIsDetailsOpen(false);
+                    }}
+                    onReject={() => {
+                        handleReject(selectedOKR);
+                        setIsDetailsOpen(false);
+                    }}
+                />
+            )}
         </div>
     );
 };
 
 // --- Helper Components ---
 
-const ApprovalCard = ({ okr, type, onApprove, onReject, allUsers = [] }: any) => {
+const ApprovalDetailModal = ({ okr, allUsers, onClose, onApprove, onReject }: any) => {
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+                <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                    <div>
+                        <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                            OKR 详情
+                            <span className="text-xs font-normal bg-brand-50 text-brand-600 px-2 py-0.5 rounded border border-brand-100 uppercase">
+                                {okr.level === 'COMPANY' ? '公司级' : okr.level === 'DEPARTMENT' ? '部门级' : '个人级'}
+                            </span>
+                        </h2>
+                        <p className="text-slate-500 text-sm mt-0.5">{okr.userName} · {okr.department || '无部门'} · {okr.period}</p>
+                    </div>
+                    <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-400 hover:text-slate-600">
+                        <X size={20} />
+                    </button>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto p-8">
+                    <div className="mb-8 p-4 bg-brand-50/30 rounded-xl border border-brand-100/50">
+                        <h3 className="text-lg font-bold text-brand-900 mb-1">{okr.title}</h3>
+                        <p className="text-sm text-slate-600 leading-relaxed">
+                            这是 {okr.userName} 在 {okr.period} 的重点目标设定。请审核其合理性和对齐情况。
+                        </p>
+                    </div>
+
+                    <div className="space-y-8">
+                        {okr.objectives.map((o: any, i: number) => (
+                            <div key={o.id} className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                                <div className="bg-slate-50 px-6 py-3 border-b border-slate-200 flex justify-between items-center">
+                                    <h4 className="font-bold text-slate-800 flex items-center gap-2">
+                                        <span className="w-6 h-6 bg-slate-800 text-white rounded-full flex items-center justify-center text-[10px]">O{i + 1}</span>
+                                        {o.content}
+                                    </h4>
+                                    <span className="text-sm font-bold text-slate-500 bg-white px-2 py-1 rounded border border-slate-200">权重: {o.weight}%</span>
+                                </div>
+                                <div className="p-6">
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="text-left text-slate-400 border-b border-slate-100">
+                                                <th className="pb-3 font-medium">关键结果 (Key Results)</th>
+                                                <th className="pb-3 font-medium w-24 text-right">权重</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-50">
+                                            {o.keyResults.map((kr: any, ki: number) => (
+                                                <tr key={kr.id} className="group">
+                                                    <td className="py-4 text-slate-600 group-hover:text-slate-900 transition-colors">
+                                                        <div className="flex items-start gap-2">
+                                                            <span className="text-slate-300 mt-0.5">KR{ki + 1}:</span>
+                                                            {kr.content}
+                                                        </div>
+                                                    </td>
+                                                    <td className="py-4 text-right font-medium text-slate-500">{kr.weight}%</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Collaboration / Feedback Section */}
+                    {okr.ccFeedback && okr.ccFeedback.length > 0 && (
+                        <div className="mt-12 bg-purple-50/50 rounded-2xl p-6 border border-purple-100">
+                             <h4 className="text-sm font-bold text-purple-900 mb-4 flex items-center gap-2">
+                                <Users size={18} /> 他人建议
+                             </h4>
+                             <div className="space-y-4">
+                                {okr.ccFeedback.map((fb: any, idx: number) => (
+                                    <div key={idx} className="bg-white p-4 rounded-xl shadow-sm border border-purple-100/50">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-bold text-slate-800 text-sm">{fb.userName}</span>
+                                                <span className="text-[10px] text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-100">{fb.role}</span>
+                                            </div>
+                                            <span className="text-[10px] text-slate-400 italic">{new Date(fb.createdAt).toLocaleDateString()}</span>
+                                        </div>
+                                        <div className="text-sm text-slate-600 italic">“{fb.comment}”</div>
+                                    </div>
+                                ))}
+                             </div>
+                        </div>
+                    )}
+                </div>
+
+                <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-between gap-4">
+                    <button onClick={onClose} className="px-6 py-2.5 text-slate-600 hover:bg-slate-200 rounded-xl font-medium transition-colors">
+                        稍后处理
+                    </button>
+                    <div className="flex gap-3">
+                        <button onClick={onReject} className="px-6 py-2.5 bg-white border border-red-200 text-red-600 hover:bg-red-50 rounded-xl font-bold transition-colors flex items-center gap-2 border-dashed">
+                            驳回
+                        </button>
+                        <button onClick={onApprove} className="px-10 py-2.5 bg-brand-600 text-white hover:bg-brand-700 rounded-xl font-bold transition-all shadow-lg shadow-brand-500/20 flex items-center gap-2">
+                            <Check size={18} /> 确认通过
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const ApprovalCard = ({ okr, type, onApprove, onReject, onDetails, allUsers = [] }: any) => {
     // 1. Process Invited Reviewers (Merges invitations with feedback status)
     const invitedReviewers = Array.from(new Set(okr.peerReviewers || []));
     const feedbacks = okr.ccFeedback || [];
@@ -270,7 +438,9 @@ const ApprovalCard = ({ okr, type, onApprove, onReject, allUsers = [] }: any) =>
             <div className="flex-1">
                 <div className="flex items-center gap-3 mb-2">
                     <span className="font-bold text-lg text-slate-800">{okr.userName}</span>
-                    <span className="text-sm bg-slate-100 px-2 py-0.5 rounded text-slate-600 border border-slate-200">{okr.department}</span>
+                    <span className="text-sm bg-slate-100 px-2 py-0.5 rounded text-slate-600 border border-slate-200 flex items-center gap-1">
+                        <Calendar size={12} /> {okr.period}
+                    </span>
                     <span className={`text-xs px-2 py-0.5 rounded border ${type === 'ASSESSMENT' ? 'bg-orange-50 text-orange-600 border-orange-100' : 'bg-indigo-50 text-indigo-600 border-indigo-100'}`}>
                         {type === 'ASSESSMENT' ? '自评审批' : 'OKR 定稿审批'}
                     </span>
@@ -331,10 +501,14 @@ const ApprovalCard = ({ okr, type, onApprove, onReject, allUsers = [] }: any) =>
             </div>
 
             <div className="flex flex-col justify-center gap-3 min-w-[120px]">
+                <button onClick={onDetails} className="bg-brand-50 border border-brand-100 text-brand-600 hover:bg-brand-100 py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors text-sm font-bold">
+                    <ClipboardList size={16} /> 详情
+                </button>
                 <button onClick={onApprove} className="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm text-sm">
                     <Check size={16} /> 通过
                 </button>
-                <button onClick={onReject} className="bg-white border border-red-200 text-red-600 hover:bg-red-50 py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors text-sm">
+                <div className="w-full h-px bg-slate-100"></div>
+                <button onClick={onReject} className="bg-white border border-slate-200 text-slate-500 hover:text-red-600 hover:border-red-100 hover:bg-red-50 py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors text-sm">
                     <X size={16} /> 驳回
                 </button>
             </div>
@@ -382,8 +556,10 @@ const FeedbackCard: React.FC<FeedbackCardProps> = ({ okr, currentUser, onSubmitF
                         </div>
                         <div>
                             <div className="flex items-center gap-2">
-                                <h3 className="font-bold text-slate-800">{okr.userName}</h3>
                                 <span className="text-xs text-slate-500 bg-slate-100 px-2 rounded-full">{okr.department}</span>
+                                <span className="text-xs text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full border border-brand-100 flex items-center gap-1">
+                                    <Calendar size={10} /> {okr.period}
+                                </span>
                                 <span className={`text-xs px-2 py-0.5 rounded font-bold ${badgeColor}`}>{label}</span>
                             </div>
                             <p className="text-sm text-slate-600 font-medium">{okr.title}</p>

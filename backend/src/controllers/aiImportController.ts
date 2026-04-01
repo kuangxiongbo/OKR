@@ -92,16 +92,17 @@ export const importOKRByAI = async (req: Request, res: Response) => {
     const parsed = await parseOKRByAI({ textContent, fileName, mimeType, imageBase64, imageList, fileBase64 });
     const wf = await getWorkflowSnapshot(currentUser.role);
 
-    // 周期修正逻辑：如果 AI 没识别出周期，或者识别出的是“未指定”
-    let finalPeriod = parsed.period;
-    if (!finalPeriod || finalPeriod.includes('未指定')) {
-      const year = new Date().getFullYear();
-      if (requestedLevel === OKRLevel.COMPANY) {
-        finalPeriod = `${year} 全年`;
-      } else {
-        // 部门和个人默认为上半年（也可按当前月份进阶判断）
-        finalPeriod = `${year} 上半年`;
-      }
+    // 周期修正逻辑：根据当前时间自动确定，忽略 AI 识别结果以提高准确性
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth(); // 0-11
+    let finalPeriod = '';
+
+    if (requestedLevel === OKRLevel.COMPANY) {
+      finalPeriod = `${year} 全年`;
+    } else {
+      // 1-6月 (Index 0-5) 归为上半年，7-12月 (Index 6-11) 归为下半年
+      finalPeriod = month <= 5 ? `${year} 上半年` : `${year} 下半年`;
     }
 
     const okr = await OKRModel.create(
