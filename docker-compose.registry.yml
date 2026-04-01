@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  # ===================== 后端服务（从镜像仓库拉取） =====================
+  backend:
+    image: 192.168.210.90:6000/okr-backend:latest
+    container_name: okr-backend
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - DB_HOST=192.168.210.90
+      - DB_PORT=5433
+      - DB_NAME=okr
+      - DB_USER=okr
+      - DB_PASSWORD=pbd76htiMAHymt3r
+      - JWT_SECRET=okr-system-secret-key-2024
+    healthcheck:
+      test: [ "CMD", "wget", "-qO-", "http://localhost:3001/health" ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - okr-network
+
+  # ===================== 前端服务（从镜像仓库拉取） =====================
+  frontend:
+    image: 192.168.210.90:6000/okr-frontend:latest
+    container_name: okr-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - okr-network
+
+networks:
+  okr-network:
+    driver: bridge
+

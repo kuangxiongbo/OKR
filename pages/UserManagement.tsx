@@ -1,9 +1,9 @@
 
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { getUsers, saveUser, deleteUser, getWeComConfig, saveWeComConfig, getSSOConfig, saveSSOConfig, getWorkflows, saveWorkflow, getDepartments, addDepartment, getRoles, addRole, getApproverRoles, deleteCustomRole, deleteWorkflow, updateCustomRole } from '../services/okrService';
+import { getUsers, saveUser, deleteUser, getWeComConfig, saveWeComConfig, getSSOConfig, saveSSOConfig, getWorkflows, saveWorkflow, getDepartments, addDepartment, updateDepartment, deleteDepartment, getRoles, addRole, getApproverRoles, deleteCustomRole, deleteWorkflow, updateCustomRole } from '../services/okrService';
 import { useCurrentUser } from '../hooks/useCurrentUser';
-import { User, Role, ApprovalWorkflow, WeComConfig, SSOConfig, ROLE_NAMES, OKR, OKRLevel, OKRStatus } from '../types';
+import { User, Role, ApprovalWorkflow, WeComConfig, SSOConfig, AIConfig, ROLE_NAMES, OKR, OKRLevel, OKRStatus } from '../types';
 import { Plus, Trash2, Edit2, Shield, MessageSquare, Cloud, Check, Save, User as UserIcon, Building, Layers, Search, X, Lock, Key, ToggleLeft, ToggleRight, Settings, Send, Users, GitMerge, Crown, AlertTriangle } from 'lucide-react';
 
 export const UserManagement: React.FC = () => {
@@ -15,6 +15,12 @@ export const UserManagement: React.FC = () => {
 
     const [wecomConfig, setWecomConfig] = useState<WeComConfig>({ corpId: '', agentId: '', secret: '', enabled: false });
     const [ssoConfig, setSSOConfig] = useState<SSOConfig>({ metadataUrl: '', clientId: '', clientSecret: '', enabled: false });
+    const [aiConfig, setAiConfig] = useState<AIConfig>({
+        enabled: false,
+        provider: 'LOCAL',
+        local: { baseUrl: 'http://localhost:11434/v1', model: 'qwen2.5-vl:7b' },
+        qwen: { apiKey: '', model: 'qwen-vl-plus', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1' }
+    });
     
     // UI State
     const [activeTab, setActiveTab] = useState<'users' | 'workflows' | 'integrations' | 'approvers'>('users');
@@ -38,17 +44,48 @@ export const UserManagement: React.FC = () => {
     const [editingCustomRoleLabel, setEditingCustomRoleLabel] = useState('');
 
     // Integration & Add Item Modal State
-    const [configModal, setConfigModal] = useState<'WECOM' | 'SSO' | 'ADD_DEPT' | 'MANAGE_ROLES' | null>(null);
+    const [configModal, setConfigModal] = useState<'WECOM' | 'SSO' | 'AI' | 'ADD_DEPT' | 'MANAGE_ROLES' | null>(null);
     const [newItemName, setNewItemName] = useState(''); // For Dept or Role name
     const [newItemKey, setNewItemKey] = useState(''); // For Role key
     
     // Temp Config State for Modal
     const [tempWeCom, setTempWeCom] = useState<WeComConfig>(wecomConfig);
     const [tempSSO, setTempSSO] = useState<SSOConfig>(ssoConfig);
+    const [tempAI, setTempAI] = useState<AIConfig>(aiConfig);
 
     useEffect(() => {
+        const handler = () => refreshData();
+        window.addEventListener('alignflow_data_updated', handler);
+
         refreshData();
+        // 从后端加载配置
+        loadConfigsFromBackend();
+
+        return () => window.removeEventListener('alignflow_data_updated', handler);
     }, []);
+
+    const loadConfigsFromBackend = async () => {
+        try {
+            const { configsAPI } = await import('../services/api');
+            // 加载企业微信配置
+            const wecomResult = await configsAPI.getWeCom();
+            if (wecomResult.success && wecomResult.data?.config) {
+                setWecomConfig(wecomResult.data.config);
+            }
+            // 加载 SSO 配置
+            const ssoResult = await configsAPI.getSSO();
+            if (ssoResult.success && ssoResult.data?.config) {
+                setSSOConfig(ssoResult.data.config);
+            }
+            const aiResult = await configsAPI.getAI();
+            if (aiResult.success && aiResult.data?.config) {
+                setAiConfig(aiResult.data.config);
+            }
+        } catch (error) {
+            console.error('从后端加载配置失败:', error);
+            // 如果后端加载失败，保留当前界面状态
+        }
+    };
 
     const refreshData = () => {
         // FILTER: Hide Admin from general user list
@@ -56,8 +93,6 @@ export const UserManagement: React.FC = () => {
         setWorkflows(getWorkflows());
         setDepartments(getDepartments());
         setRoleOptions(getRoles());
-        setWecomConfig(getWeComConfig());
-        setSSOConfig(getSSOConfig());
     }
 
     const getRoleName = (key: string) => {
@@ -187,7 +222,7 @@ export const UserManagement: React.FC = () => {
         return <div className="text-center p-10 text-red-500">仅限管理员访问</div>;
     }
 
-    const handleSaveUser = () => {
+    const handleSaveUser = async () => {
         const isDepartmentRequired = editUser.role !== Role.ADMIN;
         if (!editUser.name || !editUser.account || (isDepartmentRequired && !editUser.department)) {
             return alert("请填写完整信息 (姓名、账号、部门等)");
@@ -209,24 +244,35 @@ export const UserManagement: React.FC = () => {
             isPrimaryApprover: editUser.isPrimaryApprover || false,
         };
 
-        if (newUser.isPrimaryApprover && newUser.department) {
-            const allUsers = getUsers();
-            const conflictingUsers = allUsers.filter(u => u.department === newUser.department && u.isPrimaryApprover && u.id !== newUser.id);
-            conflictingUsers.forEach(u => saveUser({ ...u, isPrimaryApprover: false }));
-        }
+        try {
+            if (newUser.isPrimaryApprover && newUser.department) {
+                const allUsers = getUsers();
+                const conflictingUsers = allUsers.filter(u => u.department === newUser.department && u.isPrimaryApprover && u.id !== newUser.id);
+                // 等待所有冲突用户更新完成
+                await Promise.all(conflictingUsers.map(u => saveUser({ ...u, isPrimaryApprover: false })));
+            }
 
-        saveUser(newUser);
-        refreshData();
-        setIsEditing(false);
-        setEditUser({});
-        setConfirmPassword('');
-        setShowPasswordReset(false);
+            // 等待保存完成，确保数据已保存到服务器
+            await saveUser(newUser);
+            refreshData();
+            setIsEditing(false);
+            setEditUser({});
+            setConfirmPassword('');
+            setShowPasswordReset(false);
+        } catch (error: any) {
+            alert(error?.message ? `保存失败：${error.message}` : '保存失败，请检查网络/服务端日志');
+        }
     };
 
-    const handleDelete = (id: string) => {
+    const handleDelete = async (id: string) => {
         if (confirm("确定删除该用户吗?")) {
-            deleteUser(id);
-            refreshData();
+            try {
+                // 等待删除完成，确保数据已从服务器删除
+                await deleteUser(id);
+                refreshData();
+            } catch (error: any) {
+                alert(error?.message ? `删除失败：${error.message}` : '删除失败，请检查网络/服务端日志');
+            }
         }
     };
 
@@ -236,21 +282,31 @@ export const UserManagement: React.FC = () => {
         setTempWorkflow({...wf, ccRoles: wf.ccRoles || []});
     };
 
-    const handleSaveWorkflow = () => {
+    const handleSaveWorkflow = async () => {
         if (tempWorkflow) {
-            saveWorkflow(tempWorkflow);
-            setWorkflows(getWorkflows());
-            setEditingRole(null);
-            setTempWorkflow(null);
-            setIsAddingWorkflow(false);
-            setNewWorkflowRole('');
+            try {
+                // 等待保存完成，确保数据已保存到服务器
+                await saveWorkflow(tempWorkflow);
+                setWorkflows(getWorkflows());
+                setEditingRole(null);
+                setTempWorkflow(null);
+                setIsAddingWorkflow(false);
+                setNewWorkflowRole('');
+            } catch (error: any) {
+                alert(error?.message ? `保存失败：${error.message}` : '保存失败，请检查网络/服务端日志');
+            }
         }
     };
 
-    const handleDeleteWorkflow = (roleKey: string) => {
+    const handleDeleteWorkflow = async (roleKey: string) => {
         if(confirm(`确认删除角色 "${getRoleName(roleKey)}" 的审批流配置吗？`)) {
-            deleteWorkflow(roleKey);
-            refreshData();
+            try {
+                // 等待删除完成，确保数据已从服务器删除
+                await deleteWorkflow(roleKey);
+                refreshData();
+            } catch (error: any) {
+                alert(error?.message ? `删除失败：${error.message}` : '删除失败，请检查网络/服务端日志');
+            }
         }
     }
 
@@ -285,59 +341,134 @@ export const UserManagement: React.FC = () => {
     }
 
     // --- Dynamic Add Handlers ---
-    const handleAddDepartment = () => {
+    const handleAddDepartment = async () => {
         if(!newItemName.trim()) return;
-        addDepartment(newItemName);
-        refreshData();
-        setConfigModal(null);
-        setNewItemName('');
+        try {
+            // 等待保存完成，确保数据已保存到服务器
+            await addDepartment(newItemName);
+            refreshData();
+            setConfigModal(null);
+            setNewItemName('');
+        } catch (error: any) {
+            alert(error?.message ? `添加失败：${error.message}` : '添加失败，请检查网络/服务端日志');
+        }
     }
+
+    const handleRenameDepartment = async (oldName: string) => {
+        const input = window.prompt('请输入新的部门/业务线名称', oldName);
+        if (input === null) return;
+        const newName = input.trim();
+        if (!newName || newName === oldName) return;
+        try {
+            await updateDepartment(oldName, newName);
+            refreshData();
+            if (selectedDept === oldName) {
+                setSelectedDept(newName);
+            }
+        } catch (error: any) {
+            alert(error?.message ? `更新失败：${error.message}` : '更新失败，请检查网络/服务端日志');
+        }
+    };
+
+    const handleDeleteDepartment = async (name: string) => {
+        if (!confirm(`确认删除部门 "${name}" 吗？`)) return;
+        try {
+            await deleteDepartment(name);
+            refreshData();
+            if (selectedDept === name) {
+                setSelectedDept(null);
+            }
+        } catch (error: any) {
+            alert(error?.message ? `删除失败：${error.message}` : '删除失败，请检查网络/服务端日志');
+        }
+    };
 
     // Custom Roles Management
-    const handleAddRole = () => {
+    const handleAddRole = async () => {
         if(!newItemName.trim() || !newItemKey.trim()) return;
-        addRole(newItemKey, newItemName);
-        refreshData();
-        setNewItemName('');
-        setNewItemKey('');
+        try {
+            // 等待保存完成，确保数据已保存到服务器
+            await addRole(newItemKey, newItemName);
+            refreshData();
+            setNewItemName('');
+            setNewItemKey('');
+        } catch (error: any) {
+            alert(error?.message ? `添加失败：${error.message}` : '添加失败，请检查网络/服务端日志');
+        }
     }
 
-    const handleUpdateCustomRole = (key: string) => {
+    const handleUpdateCustomRole = async (key: string) => {
         if (!editingCustomRoleLabel.trim()) return;
-        updateCustomRole(key, editingCustomRoleLabel);
-        refreshData();
-        setEditingCustomRoleKey(null);
+        try {
+            // 等待保存完成，确保数据已保存到服务器
+            await updateCustomRole(key, editingCustomRoleLabel);
+            refreshData();
+            setEditingCustomRoleKey(null);
+        } catch (error: any) {
+            alert(error?.message ? `更新失败：${error.message}` : '更新失败，请检查网络/服务端日志');
+        }
     }
     
-    const handleDeleteCustomRole = (key: string) => {
+    const handleDeleteCustomRole = async (key: string) => {
         if(confirm(`确认彻底删除角色 "${getRoleName(key)}" 吗？\n警告：这将同时删除该角色的所有审批流配置。`)) {
-            deleteCustomRole(key);
-            refreshData();
+            try {
+                // 等待删除完成，确保数据已从服务器删除
+                await deleteCustomRole(key);
+                refreshData();
+            } catch (error: any) {
+                alert(error?.message ? `删除失败：${error.message}` : '删除失败，请检查网络/服务端日志');
+            }
         }
     }
 
     // --- Integration Handlers ---
-    const openConfigModal = (type: 'WECOM' | 'SSO') => {
+    const openConfigModal = (type: 'WECOM' | 'SSO' | 'AI') => {
         if (type === 'WECOM') {
-            setTempWeCom(getWeComConfig());
+            setTempWeCom(wecomConfig);
+        } else if (type === 'SSO') {
+            setTempSSO(ssoConfig);
         } else {
-            setTempSSO(getSSOConfig());
+            setTempAI(aiConfig);
         }
         setConfigModal(type);
     }
 
-    const handleSaveWeCom = () => {
-        saveWeComConfig(tempWeCom);
-        setWecomConfig(tempWeCom);
-        setConfigModal(null);
-        alert("企业微信配置已保存！");
+    const handleSaveAI = async () => {
+        try {
+            const { configsAPI } = await import('../services/api');
+            await configsAPI.saveAI(tempAI);
+            setAiConfig(tempAI);
+            setConfigModal(null);
+            alert("AI 配置已保存！");
+        } catch (error: any) {
+            alert(`保存失败: ${error.message || '未知错误'}`);
+        }
     };
 
-    const handleSaveSSO = () => {
-        saveSSOConfig(tempSSO);
-        setSSOConfig(tempSSO);
-        setConfigModal(null);
-        alert("SSO 配置已保存！");
+    const handleSaveWeCom = async () => {
+        try {
+            await saveWeComConfig(tempWeCom);
+            setWecomConfig(tempWeCom);
+            setConfigModal(null);
+            alert("企业微信配置已保存！");
+            // 重新加载配置
+            await loadConfigsFromBackend();
+        } catch (error: any) {
+            alert(`保存失败: ${error.message || '未知错误'}`);
+        }
+    };
+
+    const handleSaveSSO = async () => {
+        try {
+            await saveSSOConfig(tempSSO);
+            setSSOConfig(tempSSO);
+            setConfigModal(null);
+            alert("SSO 配置已保存！");
+            // 重新加载配置
+            await loadConfigsFromBackend();
+        } catch (error: any) {
+            alert(`保存失败: ${error.message || '未知错误'}`);
+        }
     };
     
     // Filter Logic
@@ -428,7 +559,7 @@ export const UserManagement: React.FC = () => {
                                     <button 
                                         key={dept}
                                         onClick={() => setSelectedDept(dept)}
-                                        className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors ${
+                                        className={`group w-full text-left px-3 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors ${
                                             selectedDept === dept 
                                             ? 'bg-brand-50 text-brand-700 font-medium' 
                                             : 'text-slate-600 hover:bg-slate-50'
@@ -436,6 +567,28 @@ export const UserManagement: React.FC = () => {
                                     >
                                         <div className={`w-1.5 h-1.5 rounded-full ${selectedDept === dept ? 'bg-brand-500' : 'bg-slate-300'}`}></div>
                                         <span className="truncate flex-1">{dept}</span>
+                                        <div className="items-center gap-1 hidden group-hover:flex">
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleRenameDepartment(dept);
+                                                }}
+                                                className="p-0.5 text-slate-400 hover:text-brand-600"
+                                                title="编辑名称"
+                                            >
+                                                <Edit2 size={12} />
+                                            </button>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleDeleteDepartment(dept);
+                                                }}
+                                                className="p-0.5 text-slate-400 hover:text-red-600"
+                                                title="删除部门"
+                                            >
+                                                <Trash2 size={12} />
+                                            </button>
+                                        </div>
                                         <span className="text-xs text-slate-400 bg-slate-100 px-1.5 rounded-full">{count}</span>
                                     </button>
                                 );
@@ -1097,7 +1250,163 @@ export const UserManagement: React.FC = () => {
                     </div>
                 </div>
             )}
-            
+
+            {/* Third-party Integration Tab */}
+            {activeTab === 'integrations' && (
+                <div className="space-y-6 flex-1 overflow-hidden flex flex-col">
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                        <h2 className="text-lg font-bold text-slate-800 mb-6">第三方集成配置</h2>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            {/* 企业微信配置卡片 */}
+                            <div className="border border-slate-200 rounded-lg p-6 hover:shadow-md transition-shadow">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                                            <MessageSquare className="text-green-600" size={20} />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-slate-800">企业微信</h3>
+                                            <p className="text-xs text-slate-500">WeChat Work Integration</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        {wecomConfig.enabled ? (
+                                            <span className="flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
+                                                <Check size={12} /> 已启用
+                                            </span>
+                                        ) : wecomConfig.corpId ? (
+                                            <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded">已配置未启用</span>
+                                        ) : (
+                                            <span className="text-xs text-slate-400">未配置</span>
+                                        )}
+                                    </div>
+                                </div>
+                                
+                                <div className="space-y-2 mb-4">
+                                    <div className="text-sm text-slate-600">
+                                        <span className="font-medium">Corp ID:</span> {wecomConfig.corpId || '未设置'}
+                                    </div>
+                                    <div className="text-sm text-slate-600">
+                                        <span className="font-medium">Agent ID:</span> {wecomConfig.agentId || '未设置'}
+                                    </div>
+                                </div>
+                                
+                                <button
+                                    onClick={() => {
+                                        setTempWeCom(wecomConfig);
+                                        setConfigModal('WECOM');
+                                    }}
+                                    className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                                >
+                                    <Settings size={16} />
+                                    {wecomConfig.enabled ? '编辑配置' : '配置企业微信'}
+                                </button>
+                            </div>
+
+                            {/* SSO 配置卡片 */}
+                            <div className="border border-slate-200 rounded-lg p-6 hover:shadow-md transition-shadow">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                                            <Key className="text-blue-600" size={20} />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-slate-800">SSO 单点登录</h3>
+                                            <p className="text-xs text-slate-500">Single Sign-On</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        {ssoConfig.enabled ? (
+                                            <span className="flex items-center gap-1 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                                                <Check size={12} /> 已启用
+                                            </span>
+                                        ) : ssoConfig.metadataUrl ? (
+                                            <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded">已配置未启用</span>
+                                        ) : (
+                                            <span className="text-xs text-slate-400">未配置</span>
+                                        )}
+                                    </div>
+                                </div>
+                                
+                                <div className="space-y-2 mb-4">
+                                    <div className="text-sm text-slate-600">
+                                        <span className="font-medium">Metadata URL:</span> {ssoConfig.metadataUrl ? (ssoConfig.metadataUrl.length > 30 ? ssoConfig.metadataUrl.substring(0, 30) + '...' : ssoConfig.metadataUrl) : '未设置'}
+                                    </div>
+                                    <div className="text-sm text-slate-600">
+                                        <span className="font-medium">Client ID:</span> {ssoConfig.clientId || '未设置'}
+                                    </div>
+                                </div>
+                                
+                                <button
+                                    onClick={() => {
+                                        setTempSSO(ssoConfig);
+                                        setConfigModal('SSO');
+                                    }}
+                                    className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                                >
+                                    <Settings size={16} />
+                                    {ssoConfig.enabled ? '编辑配置' : '配置 SSO'}
+                                </button>
+                            </div>
+
+                            {/* AI 配置卡片 */}
+                            <div className="border border-slate-200 rounded-lg p-6 hover:shadow-md transition-shadow">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                                            <Cloud className="text-purple-600" size={20} />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-slate-800">AI 模型</h3>
+                                            <p className="text-xs text-slate-500">本地模型 / 千问模型</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        {aiConfig.enabled ? (
+                                            <span className="flex items-center gap-1 text-xs text-purple-600 bg-purple-50 px-2 py-1 rounded">
+                                                <Check size={12} /> 已启用
+                                            </span>
+                                        ) : (
+                                            <span className="text-xs text-slate-400">未启用</span>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="space-y-2 mb-4 text-sm text-slate-600">
+                                    <div><span className="font-medium">Provider:</span> {aiConfig.provider}</div>
+                                    <div><span className="font-medium">Model:</span> {aiConfig.provider === 'QWEN' ? aiConfig.qwen?.model : aiConfig.local?.model}</div>
+                                </div>
+                                <button
+                                    onClick={() => openConfigModal('AI')}
+                                    className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                                >
+                                    <Settings size={16} />
+                                    {aiConfig.enabled ? '编辑配置' : '配置 AI'}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* 配置说明 */}
+                        <div className="mt-6 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                            <h4 className="font-medium text-slate-700 mb-2 flex items-center gap-2">
+                                <AlertTriangle size={16} className="text-amber-500" />
+                                配置说明
+                            </h4>
+                            <ul className="text-sm text-slate-600 space-y-1 list-disc list-inside">
+                                <li><strong>启用开关：</strong>在配置模态框中，使用顶部的开关可以开启或关闭企业微信/SSO 登录功能</li>
+                                <li><strong>企业微信登录：</strong>启用后，用户可以通过企业微信扫码登录系统，无需输入账号密码</li>
+                                <li><strong>SSO 单点登录：</strong>启用后，用户可以通过单点登录系统访问，实现统一身份认证</li>
+                                <li><strong>优先级：</strong>如果同时配置了企业微信和 SSO，登录页面会优先使用 SSO</li>
+                                <li><strong>实时生效：</strong>配置保存后立即生效，无需重启后端服务，不会中断业务</li>
+                                <li><strong>企业微信配置：</strong>需要填写 Corp ID（企业ID）、Agent ID（应用ID）和 Agent Secret（应用密钥）</li>
+                                <li><strong>SSO 配置：</strong>需要填写 Metadata URL（元数据地址）、Client ID（客户端ID）和 Client Secret（客户端密钥）</li>
+                                <li><strong>状态说明：</strong>已启用（绿色）- 功能已开启；已配置未启用（黄色）- 已配置但未开启；未配置（灰色）- 尚未配置</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Config & Add Modals */}
             {configModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -1106,6 +1415,7 @@ export const UserManagement: React.FC = () => {
                             <h3 className="font-bold text-lg">
                                 {configModal === 'WECOM' && '配置企业微信'}
                                 {configModal === 'SSO' && '配置 SSO 登录'}
+                                {configModal === 'AI' && '配置 AI 模型'}
                                 {configModal === 'ADD_DEPT' && '新增部门'}
                                 {configModal === 'MANAGE_ROLES' && '管理自定义角色'}
                             </h3>
@@ -1115,6 +1425,27 @@ export const UserManagement: React.FC = () => {
                         <div className="p-6">
                             {configModal === 'WECOM' && (
                                 <div className="space-y-4">
+                                    {/* 启用开关 */}
+                                    <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-200">
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">启用企业微信登录</label>
+                                            <p className="text-xs text-slate-500">开启后，用户可以通过企业微信扫码登录。配置保存后立即生效，无需重启服务。</p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setTempWeCom({...tempWeCom, enabled: !tempWeCom.enabled})}
+                                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                                                tempWeCom.enabled ? 'bg-green-600' : 'bg-slate-300'
+                                            }`}
+                                        >
+                                            <span
+                                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                                    tempWeCom.enabled ? 'translate-x-6' : 'translate-x-1'
+                                                }`}
+                                            />
+                                        </button>
+                                    </div>
+
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 mb-1">Corp ID (企业ID)</label>
                                         <input 
@@ -1148,8 +1479,29 @@ export const UserManagement: React.FC = () => {
                             
                             {configModal === 'SSO' && (
                                 <div className="space-y-4">
-                                    <div className="p-3 bg-blue-50 text-blue-800 rounded text-sm mb-4">
-                                        配置 OIDC/SAML 服务提供商信息。
+                                    {/* 启用开关 */}
+                                    <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-200">
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">启用 SSO 单点登录</label>
+                                            <p className="text-xs text-slate-500">开启后，用户可以通过 SSO 系统登录。配置保存后立即生效，无需重启服务。</p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setTempSSO({...tempSSO, enabled: !tempSSO.enabled})}
+                                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                                                tempSSO.enabled ? 'bg-blue-600' : 'bg-slate-300'
+                                            }`}
+                                        >
+                                            <span
+                                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                                    tempSSO.enabled ? 'translate-x-6' : 'translate-x-1'
+                                                }`}
+                                            />
+                                        </button>
+                                    </div>
+
+                                    <div className="p-3 bg-blue-50 text-blue-800 rounded text-sm">
+                                        配置 OIDC/OAuth2/SAML 服务提供商信息。支持 OAuth2.0、CAS 和 SAML 2.0 协议。
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 mb-1">Metadata / Issuer URL</label>
@@ -1179,6 +1531,56 @@ export const UserManagement: React.FC = () => {
                                             placeholder="client-secret-..." 
                                         />
                                     </div>
+                                </div>
+                            )}
+
+                            {configModal === 'AI' && (
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-200">
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">启用 AI 导入</label>
+                                            <p className="text-xs text-slate-500">用于从截图或文件识别 OKR 并导入到“我的 OKR”。</p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setTempAI({ ...tempAI, enabled: !tempAI.enabled })}
+                                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${tempAI.enabled ? 'bg-purple-600' : 'bg-slate-300'}`}
+                                        >
+                                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${tempAI.enabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                                        </button>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">模型来源</label>
+                                        <select
+                                            className="w-full p-2 border rounded focus:ring-2 focus:ring-purple-500 outline-none"
+                                            value={tempAI.provider}
+                                            onChange={e => setTempAI({ ...tempAI, provider: e.target.value as 'LOCAL' | 'QWEN' })}
+                                        >
+                                            <option value="LOCAL">本地大模型（OpenAI 兼容）</option>
+                                            <option value="QWEN">云端千问</option>
+                                        </select>
+                                    </div>
+
+                                    {tempAI.provider === 'LOCAL' ? (
+                                        <>
+                                            <input className="w-full p-2 border rounded" placeholder="Base URL，如 http://localhost:11434/v1"
+                                                value={tempAI.local?.baseUrl || ''} onChange={e => setTempAI({ ...tempAI, local: { ...(tempAI.local || { model: '' }), baseUrl: e.target.value } })} />
+                                            <input className="w-full p-2 border rounded" placeholder="Model，如 qwen2.5-vl:7b"
+                                                value={tempAI.local?.model || ''} onChange={e => setTempAI({ ...tempAI, local: { ...(tempAI.local || { baseUrl: '' }), model: e.target.value } })} />
+                                            <input className="w-full p-2 border rounded" placeholder="API Key（可选）"
+                                                value={tempAI.local?.apiKey || ''} onChange={e => setTempAI({ ...tempAI, local: { ...(tempAI.local || { baseUrl: '', model: '' }), apiKey: e.target.value } })} />
+                                        </>
+                                    ) : (
+                                        <>
+                                            <input className="w-full p-2 border rounded" placeholder="DashScope Base URL"
+                                                value={tempAI.qwen?.baseUrl || ''} onChange={e => setTempAI({ ...tempAI, qwen: { ...(tempAI.qwen || { apiKey: '', model: '' }), baseUrl: e.target.value } })} />
+                                            <input className="w-full p-2 border rounded" placeholder="Qwen Model，如 qwen-vl-plus"
+                                                value={tempAI.qwen?.model || ''} onChange={e => setTempAI({ ...tempAI, qwen: { ...(tempAI.qwen || { apiKey: '' }), model: e.target.value } })} />
+                                            <input type="password" className="w-full p-2 border rounded" placeholder="DashScope API Key"
+                                                value={tempAI.qwen?.apiKey || ''} onChange={e => setTempAI({ ...tempAI, qwen: { ...(tempAI.qwen || { model: '' }), apiKey: e.target.value } })} />
+                                        </>
+                                    )}
                                 </div>
                             )}
 
@@ -1276,6 +1678,11 @@ export const UserManagement: React.FC = () => {
                             )}
                             {configModal === 'SSO' && (
                                 <button onClick={handleSaveSSO} className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                                    保存配置
+                                </button>
+                            )}
+                            {configModal === 'AI' && (
+                                <button onClick={handleSaveAI} className="px-6 py-2 bg-purple-600 text-white rounded hover:bg-purple-700">
                                     保存配置
                                 </button>
                             )}

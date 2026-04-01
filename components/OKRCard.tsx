@@ -1,6 +1,6 @@
 
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { OKR, OKRStatus, FinalGrade, OKRLevel } from '../types';
 import { Users, Building, User, Link as LinkIcon, CheckCircle } from 'lucide-react';
 import { getOKRs } from '../services/okrService';
@@ -22,7 +22,25 @@ const statusLabels: Record<string, string> = {
     [OKRStatus.CLOSED]: '已归档',
 };
 
-export const OKRCard: React.FC<{ okr: OKR, onClick?: () => void }> = ({ okr, onClick }) => {
+export const OKRCard: React.FC<{ 
+  okr: OKR, 
+  onClick?: () => void,
+  isExpanded?: boolean,
+  onToggleExpand?: () => void
+}> = ({ okr, onClick, isExpanded, onToggleExpand }) => {
+  const [internalExpanded, setInternalExpanded] = useState(false);
+  
+  // Use external expanded state if provided, otherwise fallback to internal state
+  const expanded = isExpanded !== undefined ? isExpanded : internalExpanded;
+
+  const handleToggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onToggleExpand) {
+      onToggleExpand();
+    } else {
+      setInternalExpanded(prev => !prev);
+    }
+  };
   
   // Logic to unify display status for dashboard
   // "Dashboard Statuses: Only Published and Archived"
@@ -76,11 +94,11 @@ export const OKRCard: React.FC<{ okr: OKR, onClick?: () => void }> = ({ okr, onC
   return (
     <div 
       onClick={onClick}
-      className={`bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition-all cursor-pointer group flex flex-col h-full`}
+      className={`bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition-all cursor-pointer group flex flex-col`}
     >
       <div className="flex justify-between items-start mb-3">
         <div className="flex-1 mr-2">
-          <h3 className="text-lg font-bold text-slate-800 group-hover:text-brand-600 transition-colors leading-tight line-clamp-2">
+          <h3 className={`text-lg font-bold text-slate-800 group-hover:text-brand-600 transition-colors leading-tight ${expanded ? '' : 'line-clamp-2'}`}>
             {okr.title}
           </h3>
           <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500 mt-2">
@@ -114,24 +132,49 @@ export const OKRCard: React.FC<{ okr: OKR, onClick?: () => void }> = ({ okr, onC
       )}
 
       <div className="space-y-3 flex-1">
-        {okr.objectives.slice(0, 2).map((obj, i) => (
+        {(okr.objectives || []).slice(0, expanded ? okr.objectives.length : 2).map((obj, i) => (
           <div key={obj.id} className="text-sm">
             <div className="flex justify-between mb-1">
-              <span className="font-medium text-slate-700 truncate w-3/4">O{i + 1}: {obj.content}</span>
+              <span className={`font-medium text-slate-700 w-3/4 ${expanded ? 'break-words' : 'truncate'}`}>O{i + 1}: {obj.content}</span>
               <span className="text-slate-400 text-xs">{obj.weight}%</span>
             </div>
             <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
                 {/* Visual mock of progress - could be calculated from KRs */}
                <div className="bg-brand-500 h-full rounded-full" style={{ width: `${Math.random() * 60 + 20}%`}}></div>
             </div>
+            {expanded && obj.keyResults && obj.keyResults.length > 0 && (
+              <ul className="mt-2 space-y-1 text-xs text-slate-600">
+                {obj.keyResults.map((kr, krIdx) => (
+                  <li key={kr.id} className="break-words">
+                    KR{krIdx + 1}: {kr.content}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         ))}
-        {okr.objectives.length > 2 && (
+        {(!okr.objectives || okr.objectives.length === 0) && (
             <div className="text-xs text-center text-slate-400 mt-2">
-                +{okr.objectives.length - 2} 个更多目标
+                暂无目标
             </div>
         )}
+        {okr.objectives && okr.objectives.length > 2 && !expanded && (
+          <div className="text-xs text-center text-slate-400 mt-2">
+            +{okr.objectives.length - 2} 个更多目标
+          </div>
+        )}
       </div>
+      {okr.objectives && okr.objectives.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-slate-100">
+          <button
+            type="button"
+            className="text-xs text-brand-600 hover:text-brand-700 font-medium"
+            onClick={handleToggle}
+          >
+            {expanded ? '收起内容' : '查看全部内容'}
+          </button>
+        </div>
+      )}
     </div>
   );
 };

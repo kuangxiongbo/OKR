@@ -1,0 +1,47 @@
+services:
+  backend:
+    image: 192.168.210.90:6000/okr-backend:latest
+    container_name: okr-backend
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      # 1Panel 场景常见做法：通过宿主机地址访问数据库映射端口（跨应用网络更稳定）
+      # 若你确认两容器在同一网络，也可改回 PostgreSQL 容器名
+      - DB_HOST=host.docker.internal
+      - DB_PORT=5432
+      - DB_NAME=okr
+      - DB_USER=user_mPkjFK
+      - DB_PASSWORD=password_PsaHca
+      # 建议上线前替换为更强随机密钥
+      - JWT_SECRET=okr-system-secret-key-2026
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: [ "CMD", "wget", "-qO-", "http://localhost:3001/health" ]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 90s
+    networks:
+      - okr-network
+
+  frontend:
+    image: 192.168.210.90:6000/okr-frontend:latest
+    container_name: okr-frontend
+    restart: unless-stopped
+    # 宿主机 80 常被 1Panel/Nginx/其他站点占用，改用 8080（访问 http://<主机>:8080）
+    ports:
+      - "8080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - okr-network
+
+networks:
+  okr-network:
+    driver: bridge
+

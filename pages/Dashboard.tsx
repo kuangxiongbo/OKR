@@ -4,12 +4,28 @@ import { getOKRs, updateOKRStatus } from '../services/okrService';
 import { useCurrentUser } from '../hooks/useCurrentUser';
 import { OKRStatus, OKRLevel, OKR, Role } from '../types';
 import { OKRCard } from '../components/OKRCard';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import { Users, Building, ArrowLeft, Filter, LayoutGrid, RotateCcw, Eye } from 'lucide-react';
 
 export const Dashboard: React.FC = () => {
     const user = useCurrentUser();
     const [selectedDept, setSelectedDept] = useState<string | null>(null);
     const [allOKRs, setAllOKRs] = useState<OKR[]>([]);
+    const [dialog, setDialog] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: React.ReactNode;
+        onConfirm: () => void;
+        type: 'info' | 'danger' | 'success' | 'warning';
+        showCancel: boolean;
+    }>({
+        isOpen: false,
+        title: '',
+        message: '',
+        onConfirm: () => {},
+        type: 'info',
+        showCancel: true
+    });
     
     const refreshData = () => {
         let okrs = getOKRs();
@@ -32,7 +48,10 @@ export const Dashboard: React.FC = () => {
     };
 
     useEffect(() => {
+        const handler = () => refreshData();
+        window.addEventListener('alignflow_data_updated', handler);
         refreshData();
+        return () => window.removeEventListener('alignflow_data_updated', handler);
     }, [user]);
 
     const handleRevokeRequest = (okr: OKR, e: React.MouseEvent) => {
@@ -41,11 +60,31 @@ export const Dashboard: React.FC = () => {
         // Stop bubbling to parent card click
         e.stopPropagation(); 
         
-        if (confirm(`确认撤销 OKR 状态?\n\n目标: ${okr.title}\n\n警告：\n- 状态将强制变更为“草稿”\n- 现有审批流程将被终止\n- OKR 将退回给用户进行修改`)) {
-            updateOKRStatus(okr.id, OKRStatus.DRAFT);
-            // Force data reload immediately
-            setTimeout(() => refreshData(), 50);
-        }
+        setDialog({
+            isOpen: true,
+            title: '确认撤销 OKR 状态?',
+            message: (
+                <div className="space-y-2">
+                    <p>目标: <span className="font-bold text-slate-900">{okr.title}</span></p>
+                    <div className="bg-red-50 p-3 rounded-lg border border-red-100 text-xs text-red-700 space-y-1">
+                        <p className="font-bold">警告：</p>
+                        <ul className="list-disc pl-4 space-y-0.5">
+                            <li>状态将强制变更为 <span className="font-bold underline">"草稿"</span></li>
+                            <li>现有审批流程将被终止</li>
+                            <li>OKR 将退回给用户进行修改</li>
+                        </ul>
+                    </div>
+                </div>
+            ),
+            type: 'danger',
+            showCancel: true,
+            onConfirm: async () => {
+                // 等待状态更新完成，确保数据已保存到服务器
+                await updateOKRStatus(okr.id, OKRStatus.DRAFT);
+                // Force data reload immediately
+                refreshData();
+            }
+        });
     };
 
     const companyOKRs = allOKRs.filter(o => o.level === OKRLevel.COMPANY);
@@ -85,6 +124,15 @@ export const Dashboard: React.FC = () => {
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500 pb-10 relative">
+            <ConfirmDialog 
+                isOpen={dialog.isOpen}
+                onClose={() => setDialog({ ...dialog, isOpen: false })}
+                onConfirm={dialog.onConfirm}
+                title={dialog.title}
+                message={dialog.message}
+                type={dialog.type}
+                showCancel={dialog.showCancel}
+            />
             {/* Header */}
             <div className="flex justify-between items-end border-b border-slate-200 pb-6">
                 <div>
@@ -118,12 +166,12 @@ export const Dashboard: React.FC = () => {
                         </div>
                         <h2 className="text-xl font-bold text-slate-800">公司战略目标</h2>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
                         {companyOKRs.length === 0 && <p className="text-slate-400 italic col-span-full py-8 text-center bg-slate-50 rounded-lg border border-dashed border-slate-300">暂无相关 OKR。</p>}
                         {companyOKRs.map(okr => (
-                            <div key={okr.id} className="transform hover:-translate-y-1 transition-transform relative group h-full">
+                            <div key={okr.id} className="transform hover:-translate-y-1 transition-transform relative group">
                                 {renderRevokeButton(okr)}
-                                <div className="relative z-10 h-full">
+                                <div className="relative z-10">
                                     <OKRCard okr={okr} />
                                 </div>
                             </div>
@@ -141,12 +189,12 @@ export const Dashboard: React.FC = () => {
                         </div>
                         <h2 className="text-xl font-bold text-slate-800">业务线与部门目标</h2>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
                         {deptOKRs.length === 0 && <p className="text-slate-400 italic col-span-full py-8 text-center bg-slate-50 rounded-lg border border-dashed border-slate-300">暂无相关 OKR。</p>}
                         {deptOKRs.map(okr => (
-                            <div key={okr.id} className="relative group cursor-pointer h-full" onClick={() => setSelectedDept(okr.department || '')}>
+                            <div key={okr.id} className="relative group cursor-pointer" onClick={() => setSelectedDept(okr.department || '')}>
                                 <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-xl opacity-0 group-hover:opacity-30 blur transition duration-200 z-0"></div>
-                                <div className="relative z-10 h-full">
+                                <div className="relative z-10">
                                     {renderRevokeButton(okr)}
                                     <OKRCard okr={okr} />
                                     <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity bg-indigo-50 text-indigo-600 text-xs font-bold px-2 py-1 rounded-md border border-indigo-100">
@@ -189,7 +237,7 @@ export const Dashboard: React.FC = () => {
                             <Users size={16}/> 
                             当前团队目标 (上下文)
                         </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
                              {deptOKRs.filter(d => d.department === selectedDept).map(d => (
                                  <div key={d.id} className="relative">
                                      {renderRevokeButton(d)}
@@ -200,7 +248,7 @@ export const Dashboard: React.FC = () => {
                     </div>
                 )}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
                     {personalOKRs.length === 0 && (
                         <p className="text-slate-400 italic col-span-full py-12 text-center bg-slate-50 rounded-lg border border-dashed border-slate-300">
                             {selectedDept ? `"${selectedDept}" 暂无相关个人 OKR。` : '暂无个人 OKR。'}

@@ -1,10 +1,10 @@
 
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { getOKRs, createOKR, saveOKR, deleteOKR, getUsers, getApproverRoles, getWorkflows, isCadre } from '../services/okrService';
+import { getOKRs, createOKR, saveOKR, deleteOKR, getUsers, getApproverRoles, getWorkflows, isCadre, importMyOKRByAI, moveOKRPriority, mergeMyOKRs } from '../services/okrService';
 import { useCurrentUser } from '../hooks/useCurrentUser';
 import { OKR, OKRStatus, Objective, KeyResult, User, OKRLevel, Role, ROLE_NAMES } from '../types';
-import { Plus, Trash2, Save, Send, ChevronDown, ChevronRight, Sparkles, Users, Search, X, Building, User as UserIcon, Lock, Calendar, AlertCircle, Link as LinkIcon, Clock } from 'lucide-react';
+import { Plus, Trash2, Save, Send, ChevronDown, ChevronUp, ChevronRight, Sparkles, Users, Search, X, Building, User as UserIcon, Lock, Calendar, AlertCircle, Link as LinkIcon, Clock } from 'lucide-react';
 import { AICoach } from '../components/AICoach';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 
@@ -41,9 +41,20 @@ export const MyOKRs: React.FC = () => {
     const user = useCurrentUser();
     const [okrs, setOkrs] = useState<OKR[]>([]);
     const [allOKRs, setAllOKRs] = useState<OKR[]>([]);
+    const [selectedOKRIds, setSelectedOKRIds] = useState<string[]>([]);
+    const [mergeSelectMode, setMergeSelectMode] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [localOKR, setLocalOKR] = useState<OKR | null>(null);
     const [showCreateMenu, setShowCreateMenu] = useState(false);
+    const [importModalOpen, setImportModalOpen] = useState(false);
+    const [importing, setImporting] = useState(false);
+    const [importText, setImportText] = useState('');
+    const [importFileName, setImportFileName] = useState('');
+    const [importImageBase64, setImportImageBase64] = useState<string | undefined>(undefined);
+    const [importImages, setImportImages] = useState<Array<{ base64: string; mimeType?: string }>>([]);
+    const [importFileBase64, setImportFileBase64] = useState<string | undefined>(undefined);
+    const [importMimeType, setImportMimeType] = useState<string | undefined>(undefined);
+    const [importLevel, setImportLevel] = useState<OKRLevel>(OKRLevel.PERSONAL);
     const [aiModalOpen, setAiModalOpen] = useState(false);
     const [activeObjContext, setActiveObjContext] = useState<string>('');
     const [allUsers, setAllUsers] = useState<User[]>([]);
@@ -71,8 +82,65 @@ export const MyOKRs: React.FC = () => {
     const refreshData = () => {
         const all = getOKRs();
         setAllOKRs(all);
-        setOkrs(all.filter(o => o.userId === user.id));
+        const my = all.filter(o => o.userId === user.id);
+        setOkrs(my);
         setAllUsers(getUsers());
+
+        // 合并选择只保留草稿状态 OKR，避免出现已提交但仍被选中的情况
+        setSelectedOKRIds(prev => prev.filter(id => my.some(o => o.id === id && o.status === OKRStatus.DRAFT)));
+    };
+
+    const handleMovePriority = async (okrId: string, direction: 'up' | 'down') => {
+        try {
+            await moveOKRPriority(okrId, direction);
+        } catch (e: any) {
+            openAlert(e?.message || '调整优先级失败');
+        }
+    };
+
+    const toggleSelectOKR = (okrId: string, disabled: boolean) => {
+        if (disabled) return;
+        setSelectedOKRIds(prev => {
+            if (prev.includes(okrId)) return prev.filter(id => id !== okrId);
+            return [...prev, okrId];
+        });
+    };
+
+    const handleMergeSelected = async () => {
+        if (selectedOKRIds.length < 2) {
+            openAlert('请至少选择 2 个 OKR');
+            return;
+        }
+
+        openConfirm(
+            '确认合并',
+            `将选中的 ${selectedOKRIds.length} 个 OKR 合并为 1 个。合并成功后，原内容将被删除。`,
+            () => {
+                (async () => {
+                    try {
+                        await mergeMyOKRs(selectedOKRIds);
+                        setSelectedOKRIds([]);
+                        setMergeSelectMode(false);
+                        refreshData();
+                        openAlert('合并成功：原 OKR 已删除，并生成新的 OKR 草稿。');
+                    } catch (e: any) {
+                        openAlert(e?.message || '合并失败');
+                    }
+                })();
+            },
+            'danger'
+        );
+    };
+
+    const startMergeSelect = () => {
+        setSelectedOKRIds([]);
+        setMergeSelectMode(true);
+        openAlert('已进入合并选择模式：请勾选要整合的草稿 OKR（至少2个），再点击“确认合并”。');
+    };
+
+    const cancelMergeSelect = () => {
+        setSelectedOKRIds([]);
+        setMergeSelectMode(false);
     };
 
     useEffect(() => {
@@ -113,7 +181,7 @@ export const MyOKRs: React.FC = () => {
             newOKR.peerReviewers = defaultPeers;
         }
 
-        setOkrs([...okrs, newOKR]);
+        // 仅进入编辑态，不立即加入列表；只有保存/提交成功后才出现在“我的 OKR”
         handleEdit(newOKR);
         setShowCreateMenu(false);
     };
@@ -128,12 +196,17 @@ export const MyOKRs: React.FC = () => {
         setLocalOKR(okrToEdit);
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (localOKR) {
-            saveOKR(localOKR);
-            refreshData(); // Ensure fresh data reload
-            setEditingId(null);
-            setLocalOKR(null);
+            try {
+                // 等待保存完成，确保数据已保存到服务器
+                await saveOKR(localOKR);
+                refreshData(); // Ensure fresh data reload
+                setEditingId(null);
+                setLocalOKR(null);
+            } catch (error: any) {
+                openAlert(`保存失败：${error?.message || '未知错误'}`);
+            }
         }
     };
 
@@ -173,21 +246,36 @@ export const MyOKRs: React.FC = () => {
         }
     };
 
-    const executeSubmit = (okr: OKR) => {
-        const executiveRoles = [
-            Role.VP_PRODUCT, Role.VP_TECH, Role.VP_MARKET, Role.PRESIDENT
-        ];
-        const nextStatus = executiveRoles.includes(user.role as Role) 
-            ? OKRStatus.PUBLISHED 
-            : OKRStatus.PENDING_MANAGER;
+    const executeSubmit = async (okr: OKR) => {
+        try {
+            const executiveRoles = [
+                Role.VP_PRODUCT, Role.VP_TECH, Role.VP_MARKET, Role.PRESIDENT
+            ];
+            const nextStatus = executiveRoles.includes(user.role as Role) 
+                ? OKRStatus.PUBLISHED 
+                : OKRStatus.PENDING_MANAGER;
 
-        const updated = { ...okr, status: nextStatus };
-        saveOKR(updated);
-        refreshData(); // Reload to show new status
+            // 从缓存中获取最新的 OKR（包含更新后的版本号）
+            const okrs = getOKRs();
+            const latestOKR = okrs.find(o => o.id === okr.id);
+            if (!latestOKR) {
+                // 如果缓存中不存在，使用传入的 okr
+                const updated = { ...okr, status: nextStatus };
+                await saveOKR(updated);
+            } else {
+                // 使用最新的 OKR，但保留当前编辑的内容和状态，确保版本号不被覆盖
+                const updated = { ...latestOKR, ...okr, status: nextStatus, version: latestOKR.version };
+                await saveOKR(updated);
+            }
+            
+            refreshData(); // Reload to show new status
 
-        if (editingId === okr.id) {
-            setEditingId(null);
-            setLocalOKR(null);
+            if (editingId === okr.id) {
+                setEditingId(null);
+                setLocalOKR(null);
+            }
+        } catch (error: any) {
+            openAlert(`提交失败：${error?.message || '未知错误'}`);
         }
     };
 
@@ -195,13 +283,18 @@ export const MyOKRs: React.FC = () => {
         openConfirm(
             "确认删除",
             "确认删除此 OKR? 操作无法撤销。",
-            () => {
-                deleteOKR(okrId);
-                setOkrs(prev => prev.filter(o => o.id !== okrId));
-                setAllOKRs(prev => prev.filter(o => o.id !== okrId));
-                if(editingId === okrId) {
-                    setEditingId(null);
-                    setLocalOKR(null);
+            async () => {
+                try {
+                    // 等待删除完成，确保数据已从服务器删除
+                    await deleteOKR(okrId);
+                    setOkrs(prev => prev.filter(o => o.id !== okrId));
+                    setAllOKRs(prev => prev.filter(o => o.id !== okrId));
+                    if(editingId === okrId) {
+                        setEditingId(null);
+                        setLocalOKR(null);
+                    }
+                } catch (error: any) {
+                    openAlert(`删除失败：${error?.message || '未知错误'}`);
                 }
             },
             "danger"
@@ -232,6 +325,97 @@ export const MyOKRs: React.FC = () => {
         u.name.toLowerCase().includes(userSearch.toLowerCase()) &&
         !localOKR?.peerReviewers?.includes(u.id)
     );
+
+    const handlePickImportFile = async (file: File) => {
+        setImportFileName(file.name);
+        setImportMimeType(file.type || undefined);
+        if (file.type.startsWith('image/')) {
+            const b64 = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const dataUrl = String(reader.result || '');
+                    resolve(dataUrl.split(',')[1] || '');
+                };
+                reader.onerror = () => reject(new Error('读取图片失败'));
+                reader.readAsDataURL(file);
+            });
+            setImportImageBase64(b64);
+            setImportImages(prev => [...prev, { base64: b64, mimeType: file.type }]);
+            setImportFileBase64(undefined);
+            setImportText('');
+            return;
+        }
+        if (file.name.toLowerCase().endsWith('.pdf') || file.name.toLowerCase().endsWith('.ppt') || file.name.toLowerCase().endsWith('.pptx') || file.type.includes('pdf') || file.type.includes('presentation')) {
+            const b64 = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const dataUrl = String(reader.result || '');
+                    resolve(dataUrl.split(',')[1] || '');
+                };
+                reader.onerror = () => reject(new Error('读取文件失败'));
+                reader.readAsDataURL(file);
+            });
+            setImportFileBase64(b64);
+            setImportImageBase64(undefined);
+            setImportText('');
+            return;
+        }
+        const text = await file.text();
+        setImportText(text.slice(0, 20000));
+        setImportImageBase64(undefined);
+        setImportImages([]);
+        setImportFileBase64(undefined);
+    };
+
+    const handleImportByAI = async () => {
+        if (!importText.trim() && !importImageBase64 && importImages.length === 0 && !importFileBase64) {
+            openAlert('请先上传截图或文本文件。');
+            return;
+        }
+        try {
+            setImporting(true);
+            await importMyOKRByAI({
+                textContent: importText || undefined,
+                fileName: importFileName || undefined,
+                mimeType: importMimeType,
+                imageBase64: importImageBase64,
+                imageList: importImages.length > 0 ? importImages : undefined,
+                    fileBase64: importFileBase64,
+                    importLevel
+            });
+            refreshData();
+            setImportModalOpen(false);
+            setImportText('');
+            setImportFileName('');
+            setImportImageBase64(undefined);
+            setImportImages([]);
+            setImportFileBase64(undefined);
+            openAlert('AI 导入成功，已生成草稿 OKR。');
+        } catch (error: any) {
+            openAlert(`AI 导入失败：${error?.message || '未知错误'}`);
+        } finally {
+            setImporting(false);
+        }
+    };
+
+    const handlePasteScreenshot: React.ClipboardEventHandler<HTMLDivElement> = async (e) => {
+        const items = e.clipboardData?.items;
+        if (!items) return;
+        const imageItems = Array.from(items).filter((item) => item.type.startsWith('image/'));
+        if (imageItems.length === 0) return;
+        e.preventDefault();
+        for (const imageItem of imageItems) {
+            const file = imageItem.getAsFile();
+            if (file) {
+                await handlePickImportFile(file);
+            }
+        }
+    };
+
+    const handleRemoveImportImage = (idx: number) => {
+        setImportImages(prev => prev.filter((_, i) => i !== idx));
+        setImportImageBase64(undefined);
+    };
 
     const updateObj = (idx: number, field: keyof Objective, val: any) => {
         if (!localOKR) return;
@@ -282,6 +466,21 @@ export const MyOKRs: React.FC = () => {
         setAiModalOpen(true);
     };
 
+    const handleChangeOKRLevel = (newLevel: OKRLevel) => {
+        if (!localOKR) return;
+        const year = new Date().getFullYear();
+        const nextPeriod = newLevel === OKRLevel.COMPANY ? `${year} 全年` : `${year} 上半年`;
+
+        setLocalOKR({
+            ...localOKR,
+            level: newLevel,
+            period: nextPeriod,
+            parentOKRId: newLevel === OKRLevel.COMPANY ? undefined : localOKR.parentOKRId,
+            // Peer Review 仅个人 OKR 需要；切换类型时清空，避免提交时携带错误数据
+            peerReviewers: newLevel === OKRLevel.PERSONAL ? (localOKR.peerReviewers || []) : []
+        });
+    };
+
     // --- Permissions Logic ---
     const executiveRoles = [Role.VP_PRODUCT, Role.VP_TECH, Role.VP_MARKET, Role.PRESIDENT];
 
@@ -300,6 +499,13 @@ export const MyOKRs: React.FC = () => {
     const canCreatePersonalOKR = true; 
 
     const deptLevelLabel = isBusinessLineHead ? '业务线 OKR' : '部门/团队 OKR';
+
+    const getDefaultImportLevel = (): OKRLevel => {
+        // 与“创建新 OKR”菜单保持一致的优先级：公司 -> 部门 -> 个人
+        if (canCreateCompanyOKR) return OKRLevel.COMPANY;
+        if (canCreateDepartmentOKR) return OKRLevel.DEPARTMENT;
+        return OKRLevel.PERSONAL;
+    };
 
     // --- Parent OKR Candidates with Grouping ---
     const parentOKRGroups = useMemo(() => {
@@ -403,6 +609,27 @@ export const MyOKRs: React.FC = () => {
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">标题</label>
                         <input className="w-full p-2 border rounded focus:ring-2 ring-brand-500 outline-none" value={localOKR.title} onChange={e => setLocalOKR({...localOKR, title: e.target.value})} />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-2">
+                            <Sparkles size={14} /> OKR 类型
+                        </label>
+                        <div className="relative">
+                            <select
+                                className="w-full p-2 border rounded focus:ring-2 ring-brand-500 outline-none appearance-none bg-white pr-8"
+                                value={localOKR.level}
+                                onChange={e => handleChangeOKRLevel(e.target.value as OKRLevel)}
+                            >
+                                {canCreateCompanyOKR && <option value={OKRLevel.COMPANY}>公司 OKR</option>}
+                                {canCreateDepartmentOKR && <option value={OKRLevel.DEPARTMENT}>{deptLevelLabel}</option>}
+                                {canCreatePersonalOKR && <option value={OKRLevel.PERSONAL}>个人 OKR</option>}
+                            </select>
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                                <ChevronDown size={16} />
+                            </div>
+                        </div>
+                        <p className="text-xs text-slate-400 mt-1">用于保证导入/创建时类型一致，支持后续调整。</p>
                     </div>
 
                     <div>
@@ -565,7 +792,47 @@ export const MyOKRs: React.FC = () => {
             {/* ... (Main View Code) ... */}
             <div className="flex justify-between items-center mb-8">
                 <h1 className="text-2xl font-bold text-slate-900">我的 OKR</h1>
-                <div className="relative">
+                <div className="relative flex items-center gap-2">
+                    <button
+                        onClick={() => {
+                            setImportLevel(getDefaultImportLevel());
+                            setImportModalOpen(true);
+                        }}
+                        className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 flex items-center gap-2 shadow-sm transition-all"
+                    >
+                        <Sparkles size={18} /> AI 导入
+                    </button>
+                    {!mergeSelectMode ? (
+                        <button
+                            type="button"
+                            onClick={startMergeSelect}
+                            className="px-4 py-2 rounded-lg border border-indigo-200 text-indigo-700 bg-white hover:bg-indigo-50 flex items-center gap-2 shadow-sm transition-all"
+                            title="开始选择多个草稿 OKR 并整合"
+                        >
+                            合并
+                        </button>
+                    ) : (
+                        <>
+                            <button
+                                type="button"
+                                onClick={handleMergeSelected}
+                                disabled={selectedOKRIds.length < 2}
+                                className="px-4 py-2 rounded-lg border border-indigo-200 text-indigo-700 bg-white hover:bg-indigo-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm transition-all"
+                                title="确认合并为一个 OKR（原内容将删除）"
+                            >
+                                确认合并
+                                {selectedOKRIds.length >= 2 ? `(${selectedOKRIds.length})` : ''}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={cancelMergeSelect}
+                                className="px-4 py-2 rounded-lg border border-slate-200 text-slate-600 bg-white hover:bg-slate-50 flex items-center gap-2 shadow-sm transition-all"
+                                title="取消合并选择"
+                            >
+                                取消
+                            </button>
+                        </>
+                    )}
                     <button onClick={() => setShowCreateMenu(!showCreateMenu)} className="bg-brand-600 text-white px-4 py-2 rounded-lg hover:bg-brand-700 flex items-center gap-2 shadow-sm transition-all"><Plus size={20} /> 创建新 OKR <ChevronDown size={16} /></button>
                     {showCreateMenu && (
                         <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl border border-slate-200 z-20 py-1 animate-in fade-in slide-in-from-top-2">
@@ -588,7 +855,7 @@ export const MyOKRs: React.FC = () => {
             <div className="grid gap-4">
                 {okrs.length === 0 && <div className="text-center py-20 bg-white rounded-xl border border-dashed border-slate-300 text-slate-500">您还没有任何 OKR。</div>}
                 
-                {okrs.map(okr => {
+                {okrs.map((okr, idx) => {
                     let badgeLabel = '个人 OKR';
                     let badgeColor = 'bg-slate-100 text-slate-600';
                     if (okr.level === OKRLevel.COMPANY) { badgeLabel = '公司 OKR'; badgeColor = 'bg-red-100 text-red-700'; }
@@ -635,16 +902,56 @@ export const MyOKRs: React.FC = () => {
                                         </div>
                                     )}
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex flex-col items-end gap-2">
+                                    {mergeSelectMode && okr.status === OKRStatus.DRAFT && (
+                                        <label className="flex items-center gap-2 cursor-pointer select-none">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedOKRIds.includes(okr.id)}
+                                                onChange={() => toggleSelectOKR(okr.id, false)}
+                                                className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                                                title="选择用于合并"
+                                            />
+                                        </label>
+                                    )}
                                     <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${statusColor}`}>{statusLabel}</span>
+                                    {okrs.length > 1 && (
+                                        <div className="flex items-center gap-1">
+                                            <button
+                                                type="button"
+                                                disabled={idx === 0}
+                                                onClick={() => handleMovePriority(okr.id, 'up')}
+                                                className={`p-1.5 rounded border text-slate-600 transition-colors ${
+                                                    idx === 0 ? 'opacity-40 cursor-not-allowed bg-white' : 'hover:bg-slate-50 bg-white'
+                                                }`}
+                                                title="上移"
+                                            >
+                                                <ChevronUp size={16} />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                disabled={idx === okrs.length - 1}
+                                                onClick={() => handleMovePriority(okr.id, 'down')}
+                                                className={`p-1.5 rounded border text-slate-600 transition-colors ${
+                                                    idx === okrs.length - 1 ? 'opacity-40 cursor-not-allowed bg-white' : 'hover:bg-slate-50 bg-white'
+                                                }`}
+                                                title="下移"
+                                            >
+                                                <ChevronDown size={16} />
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                             <div className="space-y-2 mb-6 mt-2">
-                                {okr.objectives.map((o, idx) => (
+                                {(okr.objectives || []).map((o, idx) => (
                                     <div key={o.id} className="flex items-baseline gap-2 text-sm text-slate-700">
                                         <span className="font-semibold text-slate-400">O{idx+1}:</span><span>{o.content} ({o.weight}%)</span>
                                     </div>
                                 ))}
+                                {(!okr.objectives || okr.objectives.length === 0) && (
+                                    <div className="text-xs text-slate-400 italic">暂无目标</div>
+                                )}
                             </div>
                             <div className="flex gap-3 pt-4 border-t border-slate-100">
                                 {okr.status === OKRStatus.DRAFT ? (
@@ -685,6 +992,124 @@ export const MyOKRs: React.FC = () => {
                     );
                 })}
             </div>
+
+            {importModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onPaste={handlePasteScreenshot}>
+                    <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 w-[640px] max-w-[95vw] p-6 space-y-5 max-h-[85vh] overflow-y-auto">
+                        <div className="flex items-start justify-between gap-4">
+                            <div className="space-y-1">
+                                <h3 className="text-lg font-bold text-slate-900">AI 智能导入 OKR</h3>
+                                <div className="text-xs text-slate-500">支持截图/文本</div>
+                            </div>
+                            <button
+                                onClick={() => setImportModalOpen(false)}
+                                className="p-1.5 rounded-lg hover:bg-slate-50 text-slate-500 hover:text-slate-700 transition-colors"
+                                aria-label="关闭"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <div className="rounded-xl border border-slate-100 bg-white p-4">
+                            <div className="grid md:grid-cols-1 gap-4 items-center">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-800 mb-2">OKR 类型</label>
+                                    <div className="relative">
+                                        <select
+                                            className="w-full p-2.5 pr-9 border rounded-lg focus:ring-2 focus:ring-brand-500/30 outline-none appearance-none bg-white text-slate-900"
+                                            value={importLevel}
+                                            onChange={e => setImportLevel(e.target.value as OKRLevel)}
+                                        >
+                                            {canCreateCompanyOKR && <option value={OKRLevel.COMPANY}>公司 OKR</option>}
+                                            {canCreateDepartmentOKR && <option value={OKRLevel.DEPARTMENT}>{deptLevelLabel}</option>}
+                                            {canCreatePersonalOKR && <option value={OKRLevel.PERSONAL}>个人 OKR</option>}
+                                        </select>
+                                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                                            <ChevronDown size={16} />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4">
+                            <label className="block">
+                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                    <div className="space-y-1">
+                                        <div className="text-sm font-medium text-slate-800">选择文件</div>
+                                        <div className="text-xs text-slate-500">截图/文本文件（可多选）</div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs text-slate-500 whitespace-nowrap">
+                                            {importFileName ? `已选择：${importFileName}` : '未选择任何文件'}
+                                        </span>
+                                        <span className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-sm text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors">
+                                            浏览
+                                        </span>
+                                    </div>
+                                </div>
+                                <input
+                                    type="file"
+                                    multiple
+                                    className="hidden"
+                                    accept="image/*,.txt,.md,.csv,.json,.pdf,.ppt,.pptx,application/pdf,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                                    onChange={async e => {
+                                        const files = Array.from(e.target.files || []);
+                                        for (const f of files) {
+                                            await handlePickImportFile(f);
+                                        }
+                                    }}
+                                />
+                            </label>
+
+                            {importImages.length > 0 && (
+                                <div className="mt-3 space-y-2">
+                                    <div className="text-xs text-slate-500">已添加截图：{importImages.length} 张</div>
+                                    <div className="max-h-28 overflow-y-auto space-y-1">
+                                        {importImages.map((img, idx) => (
+                                            <div
+                                                key={`${idx}-${img.base64.slice(0, 12)}`}
+                                                className="flex items-center justify-between text-xs text-slate-600 bg-white border rounded-lg px-2 py-1"
+                                            >
+                                                <span>截图 {idx + 1}</span>
+                                                <button
+                                                    onClick={() => handleRemoveImportImage(idx)}
+                                                    className="text-red-600 hover:text-red-700 hover:underline"
+                                                >
+                                                    删除
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <textarea
+                            className="w-full h-44 border rounded-xl p-3 text-sm text-slate-900 bg-white focus:ring-2 focus:ring-brand-500/30 outline-none resize-none"
+                            placeholder="可直接粘贴 OKR 文本内容（不上传文件也可以）"
+                            value={importText}
+                            onChange={e => setImportText(e.target.value)}
+                        />
+
+                        <div className="flex justify-end gap-2 pt-1">
+                            <button
+                                onClick={() => setImportModalOpen(false)}
+                                className="px-4 py-2 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors"
+                            >
+                                取消
+                            </button>
+                            <button
+                                disabled={importing}
+                                onClick={handleImportByAI}
+                                className="px-4 py-2 rounded-lg bg-purple-600 text-white disabled:opacity-50 hover:bg-purple-700 transition-colors focus:ring-2 focus:ring-purple-400/40"
+                            >
+                                {importing ? '识别中...' : '识别并导入'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

@@ -24,25 +24,25 @@ export const Approvals: React.FC = () => {
         onConfirm?: () => void;
     }>({ isOpen: false, title: '', message: '', type: 'info', showCancel: true });
 
-    const openAlert = (title: string, message: React.ReactNode, type: 'info'|'success'|'warning'|'danger' = 'info') => {
+    const openAlert = (title: string, message: React.ReactNode, type: 'info' | 'success' | 'warning' | 'danger' = 'info') => {
         setDialog({ isOpen: true, title, message, type, showCancel: false });
     };
 
     const refreshData = () => {
         const all = getOKRs();
         setAllUsers(getUsers());
-        
+
         // 1. Workflow Approvals (Creation only)
         const workflowItems = all.filter(okr => {
             if (user.role === Role.ADMIN) {
-                return okr.status === OKRStatus.PENDING_MANAGER || 
-                       okr.status === OKRStatus.PENDING_GM;
+                return okr.status === OKRStatus.PENDING_MANAGER ||
+                    okr.status === OKRStatus.PENDING_GM;
             }
 
             if (!okr.department) return false;
             const { l1, l2 } = getApproverRoles(okr);
             const isDepartmentMatch = user.department === okr.department;
-             const isGlobalRole = [
+            const isGlobalRole = [
                 Role.PRODUCT_GM, Role.TECH_GM, Role.VP_PRODUCT,
                 Role.VP_TECH, Role.VP_MARKET, Role.PRESIDENT
             ].includes(user.role as Role);
@@ -53,7 +53,7 @@ export const Approvals: React.FC = () => {
             } else if (okr.status === OKRStatus.PENDING_GM) {
                 return l2 && user.role === l2;
             }
-            
+
             return false;
         });
 
@@ -63,18 +63,18 @@ export const Approvals: React.FC = () => {
             // Filter out self
             if (okr.userId === user.id) return false;
             if (okr.isPerformanceArchived) return false;
-            
+
             // STRICTLY Filter for Creation Phase statuses
-            const isCreationPhase = 
-                okr.status === OKRStatus.DRAFT || 
-                okr.status === OKRStatus.PENDING_MANAGER || 
+            const isCreationPhase =
+                okr.status === OKRStatus.DRAFT ||
+                okr.status === OKRStatus.PENDING_MANAGER ||
                 okr.status === OKRStatus.PENDING_GM;
-            
+
             if (!isCreationPhase) return false;
 
             // A. Peer Review (Invitation)
             const isPeer = okr.peerReviewers?.includes(user.id);
-            
+
             // B. CC (Copy)
             const { cc } = getApproverRoles(okr);
             const isCC = cc.includes(user.role);
@@ -94,27 +94,29 @@ export const Approvals: React.FC = () => {
 
     // --- Actions ---
 
-    const handleApproveCreation = (okr: OKR) => {
+    const handleApproveCreation = async (okr: OKR) => {
         if (okr.status === OKRStatus.PENDING_MANAGER) {
-             const { l2 } = getApproverRoles(okr);
-             if (l2) {
-                updateOKRStatus(okr.id, OKRStatus.PENDING_GM);
-             } else {
-                updateOKRStatus(okr.id, OKRStatus.PUBLISHED);
-             }
+            const { l2 } = getApproverRoles(okr);
+            if (l2) {
+                // 等待状态更新完成，确保数据已保存到服务器
+                await updateOKRStatus(okr.id, OKRStatus.PENDING_GM);
+            } else {
+                await updateOKRStatus(okr.id, OKRStatus.PUBLISHED);
+            }
         } else if (okr.status === OKRStatus.PENDING_GM) {
-             updateOKRStatus(okr.id, OKRStatus.PUBLISHED);
+            await updateOKRStatus(okr.id, OKRStatus.PUBLISHED);
         }
         setPending(pending.filter(p => p.id !== okr.id));
     };
 
-    const handleReject = (okr: OKR) => {
+    const handleReject = async (okr: OKR) => {
         // Creation reject, back to DRAFT.
-        updateOKRStatus(okr.id, OKRStatus.DRAFT);
+        // 等待状态更新完成，确保数据已保存到服务器
+        await updateOKRStatus(okr.id, OKRStatus.DRAFT);
         setPending(pending.filter(p => p.id !== okr.id));
     };
 
-    const handleSubmitFeedback = (okr: OKR, comment: string, grade?: string) => {
+    const handleSubmitFeedback = async (okr: OKR, comment: string, grade?: string) => {
         if (!comment.trim()) {
             openAlert("提示", "请输入建议内容。", "warning");
             return;
@@ -122,7 +124,7 @@ export const Approvals: React.FC = () => {
         const newOKR = { ...okr };
         // Unify storage in ccFeedback for simplicity
         if (!newOKR.ccFeedback) newOKR.ccFeedback = [];
-        
+
         const existingIdx = newOKR.ccFeedback.findIndex(f => f.userId === user.id);
         const feedbackPayload = {
             userId: user.id,
@@ -138,15 +140,20 @@ export const Approvals: React.FC = () => {
         } else {
             newOKR.ccFeedback.push(feedbackPayload);
         }
-        
-        saveOKR(newOKR);
-        // Note: saveOKR dispatches event which triggers refreshData via useEffect
-        openAlert("成功", "建议已提交。", "success");
+
+        // 等待保存完成，确保数据已保存到服务器
+        try {
+            await saveOKR(newOKR);
+            // Note: saveOKR dispatches event which triggers refreshData via useEffect
+            openAlert("成功", "建议已提交。", "success");
+        } catch (error: any) {
+            openAlert("失败", error?.message || "保存建议失败", "danger");
+        }
     }
 
     return (
         <div className="animate-in fade-in duration-300">
-             <ConfirmDialog 
+            <ConfirmDialog
                 isOpen={dialog.isOpen}
                 onClose={() => setDialog({ ...dialog, isOpen: false })}
                 onConfirm={dialog.onConfirm}
@@ -156,15 +163,15 @@ export const Approvals: React.FC = () => {
                 showCancel={dialog.showCancel}
             />
 
-             <div className="flex justify-between items-center mb-6">
-                 <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-3">
-                     <Check /> 审批与建议中心
-                 </h1>
-             </div>
+            <div className="flex justify-between items-center mb-6">
+                <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-3">
+                    <Check /> 审批与建议中心
+                </h1>
+            </div>
 
-             {/* Tabs */}
-             <div className="flex gap-2 border-b border-slate-200 mb-6 overflow-x-auto">
-                <button 
+            {/* Tabs */}
+            <div className="flex gap-2 border-b border-slate-200 mb-6 overflow-x-auto">
+                <button
                     onClick={() => setActiveTab('WORKFLOW')}
                     className={`pb-3 px-6 font-medium text-sm transition-colors relative whitespace-nowrap flex items-center gap-2 ${activeTab === 'WORKFLOW' ? 'text-brand-600' : 'text-slate-500 hover:text-slate-700'}`}
                 >
@@ -176,7 +183,7 @@ export const Approvals: React.FC = () => {
                     )}
                     {activeTab === 'WORKFLOW' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-brand-600"></div>}
                 </button>
-                <button 
+                <button
                     onClick={() => setActiveTab('FEEDBACK')}
                     className={`pb-3 px-6 font-medium text-sm transition-colors relative whitespace-nowrap flex items-center gap-2 ${activeTab === 'FEEDBACK' ? 'text-brand-600' : 'text-slate-500 hover:text-slate-700'}`}
                 >
@@ -188,10 +195,10 @@ export const Approvals: React.FC = () => {
                     )}
                     {activeTab === 'FEEDBACK' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-brand-600"></div>}
                 </button>
-             </div>
+            </div>
 
-             {activeTab === 'WORKFLOW' && (
-                 <div className="space-y-8 animate-in fade-in slide-in-from-left-4">
+            {activeTab === 'WORKFLOW' && (
+                <div className="space-y-8 animate-in fade-in slide-in-from-left-4">
                     {/* Section 1: OKR Creation Approvals */}
                     <section>
                         <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2">
@@ -200,37 +207,37 @@ export const Approvals: React.FC = () => {
                         {pending.length === 0 && <p className="text-slate-400 italic text-sm ml-6 mb-6">暂无定稿申请。</p>}
                         <div className="space-y-4">
                             {pending.map(okr => (
-                                <ApprovalCard 
-                                    key={okr.id} 
-                                    okr={okr} 
-                                    type="CREATION" 
+                                <ApprovalCard
+                                    key={okr.id}
+                                    okr={okr}
+                                    type="CREATION"
                                     allUsers={allUsers}
-                                    onApprove={() => handleApproveCreation(okr)} 
+                                    onApprove={() => handleApproveCreation(okr)}
                                     onReject={() => handleReject(okr)}
                                 />
                             ))}
                         </div>
                     </section>
-                 </div>
-             )}
+                </div>
+            )}
 
-             {activeTab === 'FEEDBACK' && (
-                 <div className="space-y-4 animate-in fade-in slide-in-from-left-4">
-                     <div className="flex items-center gap-2 text-sm text-slate-500 bg-indigo-50 p-3 rounded mb-4 border border-indigo-100">
-                         <MessageSquare size={16} className="text-indigo-500"/>
-                         <span>以下为您受邀在「制定阶段」协作或「抄送」的 OKR。您可以提供建议以帮助负责人完善目标。</span>
-                     </div>
-                     {feedbackItems.length === 0 && <div className="text-center py-10 text-slate-400">暂无相关记录。</div>}
-                     {feedbackItems.map(okr => (
-                         <FeedbackCard 
-                            key={okr.id} 
-                            okr={okr} 
+            {activeTab === 'FEEDBACK' && (
+                <div className="space-y-4 animate-in fade-in slide-in-from-left-4">
+                    <div className="flex items-center gap-2 text-sm text-slate-500 bg-indigo-50 p-3 rounded mb-4 border border-indigo-100">
+                        <MessageSquare size={16} className="text-indigo-500" />
+                        <span>以下为您受邀在「制定阶段」协作或「抄送」的 OKR。您可以提供建议以帮助负责人完善目标。</span>
+                    </div>
+                    {feedbackItems.length === 0 && <div className="text-center py-10 text-slate-400">暂无相关记录。</div>}
+                    {feedbackItems.map(okr => (
+                        <FeedbackCard
+                            key={okr.id}
+                            okr={okr}
                             currentUser={user}
-                            onSubmitFeedback={(comment, grade) => handleSubmitFeedback(okr, comment, grade)} 
-                         />
-                     ))}
-                 </div>
-             )}
+                            onSubmitFeedback={(comment, grade) => handleSubmitFeedback(okr, comment, grade)}
+                        />
+                    ))}
+                </div>
+            )}
         </div>
     );
 };
@@ -239,7 +246,7 @@ export const Approvals: React.FC = () => {
 
 const ApprovalCard = ({ okr, type, onApprove, onReject, allUsers = [] }: any) => {
     // 1. Process Invited Reviewers (Merges invitations with feedback status)
-    const invitedReviewers = okr.peerReviewers || [];
+    const invitedReviewers = Array.from(new Set(okr.peerReviewers || []));
     const feedbacks = okr.ccFeedback || [];
 
     const reviewerStatus = invitedReviewers.map((uid: string) => {
@@ -269,11 +276,11 @@ const ApprovalCard = ({ okr, type, onApprove, onReject, allUsers = [] }: any) =>
                     </span>
                 </div>
                 <h3 className="text-md font-medium text-brand-700 mb-4">{okr.title}</h3>
-                
+
                 <div className="bg-slate-50 p-4 rounded-lg space-y-3 border border-slate-100">
                     {okr.objectives.map((o: any, i: number) => (
                         <div key={o.id}>
-                            <p className="font-semibold text-sm text-slate-800">O{i+1}: {o.content} ({o.weight}%)</p>
+                            <p className="font-semibold text-sm text-slate-800">O{i + 1}: {o.content} ({o.weight}%)</p>
                             <ul className="pl-4 mt-1 list-disc text-xs text-slate-600">
                                 {o.keyResults.map((kr: any) => <li key={kr.id}>{kr.content} ({kr.weight}%)</li>)}
                             </ul>
@@ -285,7 +292,7 @@ const ApprovalCard = ({ okr, type, onApprove, onReject, allUsers = [] }: any) =>
                 {hasContent && (
                     <div className="mt-4 bg-purple-50 rounded-lg p-3 border border-purple-100">
                         <h4 className="text-xs font-bold text-purple-800 mb-2 flex items-center gap-1">
-                            <Users size={12}/> 协作成员建议 / 反馈情况
+                            <Users size={12} /> 协作成员建议 / 反馈情况
                         </h4>
                         <div className="space-y-2">
                             {/* Reviewers List */}
@@ -298,7 +305,7 @@ const ApprovalCard = ({ okr, type, onApprove, onReject, allUsers = [] }: any) =>
                                         </div>
                                         {r.isPending ? (
                                             <span className="text-[10px] text-slate-400 italic flex items-center gap-1">
-                                                <Clock size={10}/> 待协作评估
+                                                <Clock size={10} /> 待协作评估
                                             </span>
                                         ) : (
                                             <span className="text-slate-400 scale-90">{new Date(r.feedback.createdAt).toLocaleDateString()}</span>
@@ -343,7 +350,7 @@ interface FeedbackCardProps {
 
 const FeedbackCard: React.FC<FeedbackCardProps> = ({ okr, currentUser, onSubmitFeedback }) => {
     const [expanded, setExpanded] = useState(false);
-    
+
     // Using simple state initialization. 
     // NOTE: When 'okr' prop changes (after submit), we want to update the comment/grade state.
     // We can use a key on the parent or useEffect here.
@@ -359,7 +366,7 @@ const FeedbackCard: React.FC<FeedbackCardProps> = ({ okr, currentUser, onSubmitF
 
     // Determine context
     const isCreationPhase = okr.status === OKRStatus.PENDING_MANAGER || okr.status === OKRStatus.PENDING_GM;
-    
+
     // Peer vs CC
     const isPeer = okr.peerReviewers?.includes(currentUser.id);
     const label = isPeer ? '邀请建议 (初稿)' : '抄送/建议';
@@ -383,7 +390,7 @@ const FeedbackCard: React.FC<FeedbackCardProps> = ({ okr, currentUser, onSubmitF
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
-                        {existingFeedback && <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded font-bold flex items-center gap-1"><Check size={12}/> 已反馈</span>}
+                        {existingFeedback && <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded font-bold flex items-center gap-1"><Check size={12} /> 已反馈</span>}
                         <button className="text-sm text-slate-400 hover:text-indigo-600 underline">
                             {expanded ? '收起详情' : '查看 & 建议'}
                         </button>
@@ -399,7 +406,7 @@ const FeedbackCard: React.FC<FeedbackCardProps> = ({ okr, currentUser, onSubmitF
                             {okr.objectives.map((o, i) => (
                                 <div key={o.id}>
                                     <div className="flex justify-between text-sm font-bold text-slate-700 mb-1">
-                                        <span>O{i+1}: {o.content}</span>
+                                        <span>O{i + 1}: {o.content}</span>
                                         <span className="text-slate-400">{o.weight}%</span>
                                     </div>
                                     <ul className="space-y-1">
@@ -416,10 +423,10 @@ const FeedbackCard: React.FC<FeedbackCardProps> = ({ okr, currentUser, onSubmitF
 
                     <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-100">
                         <h4 className="text-sm font-bold text-indigo-900 mb-3 flex items-center gap-2">
-                            <MessageSquare size={16}/> 
+                            <MessageSquare size={16} />
                             填写建议 (帮助完善目标)
                         </h4>
-                        <textarea 
+                        <textarea
                             className="w-full p-3 border border-indigo-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-h-[80px]"
                             placeholder="请对目标设定的合理性、挑战性提出建议..."
                             value={comment}
@@ -431,7 +438,7 @@ const FeedbackCard: React.FC<FeedbackCardProps> = ({ okr, currentUser, onSubmitF
                                 {!isCreationPhase && (
                                     <>
                                         <span className="text-xs font-bold text-slate-600">建议评级 (可选):</span>
-                                        <select 
+                                        <select
                                             className="text-sm border border-indigo-200 rounded p-1 outline-none focus:border-indigo-500 bg-white"
                                             value={grade}
                                             onChange={e => setGrade(e.target.value)}
@@ -446,7 +453,7 @@ const FeedbackCard: React.FC<FeedbackCardProps> = ({ okr, currentUser, onSubmitF
                                     </>
                                 )}
                             </div>
-                            <button 
+                            <button
                                 onClick={() => onSubmitFeedback(comment, grade)}
                                 className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 flex items-center gap-2 transition-colors shadow-sm"
                             >

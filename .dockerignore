@@ -1,0 +1,11 @@
+node_modules
+dist
+.vite
+.git
+.cursor
+.DS_Store
+*.log
+npm-debug.log*
+backend/node_modules
+backend/dist
+backend/.env

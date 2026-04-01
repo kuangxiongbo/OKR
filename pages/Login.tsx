@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { login } from '../services/okrService';
-import { Lock, User, ArrowRight, Info, CheckCircle2 } from 'lucide-react';
+import { authAPI } from '../services/api';
+import { Lock, User, ArrowRight, Info, CheckCircle2, MessageCircle, Key, Loader2 } from 'lucide-react';
 
 export const Login: React.FC = () => {
     const navigate = useNavigate();
@@ -9,14 +10,18 @@ export const Login: React.FC = () => {
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [checkingConfig, setCheckingConfig] = useState(true);
+    const [wechatEnabled, setWechatEnabled] = useState(false);
+    const [ssoEnabled, setSsoEnabled] = useState(false);
+    const [ssoProvider, setSsoProvider] = useState<string | null>(null);
 
-    const handleLogin = (e: React.FormEvent) => {
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
         setLoading(true);
 
-        setTimeout(() => {
-            const result = login(account, password);
+        try {
+            const result = await login(account, password);
             setLoading(false);
             
             if (result.success) {
@@ -24,8 +29,108 @@ export const Login: React.FC = () => {
             } else {
                 setError(result.message || '登录失败');
             }
-        }, 600);
+        } catch (error: any) {
+            setLoading(false);
+            setError(error.message || '登录失败');
+        }
     };
+
+    const handleWeChatLogin = async () => {
+        try {
+            setError('');
+            setLoading(true);
+            const result = await authAPI.getWeChatAuthorizeUrl();
+            if (result.success && result.data?.url) {
+                // 跳转到企业微信授权页面
+                window.location.href = result.data.url;
+            } else {
+                setLoading(false);
+                setError('获取企业微信授权 URL 失败');
+            }
+        } catch (error: any) {
+            setLoading(false);
+            setError(error.message || '企业微信登录失败');
+        }
+    };
+
+    const handleSSOLogin = async () => {
+        try {
+            setError('');
+            setLoading(true);
+            const result = await authAPI.getSSOAuthorizeUrl();
+            if (result.success && result.data?.url) {
+                // 跳转到 SSO 授权页面
+                window.location.href = result.data.url;
+            } else {
+                setLoading(false);
+                setError('获取 SSO 授权 URL 失败');
+            }
+        } catch (error: any) {
+            setLoading(false);
+            setError(error.message || 'SSO 登录失败');
+        }
+    };
+
+    // 检查登录配置
+    useEffect(() => {
+        const checkConfig = async () => {
+            try {
+                const result = await authAPI.getLoginConfig();
+                if (result.success && result.data) {
+                    setWechatEnabled(result.data.wechat?.enabled || false);
+                    setSsoEnabled(result.data.sso?.enabled || false);
+                    setSsoProvider(result.data.sso?.provider || null);
+
+                    // 如果配置了 SSO，自动跳转
+                    if (result.data.sso?.enabled) {
+                        try {
+                            const ssoResult = await authAPI.getSSOAuthorizeUrl();
+                            if (ssoResult.success && ssoResult.data?.url) {
+                                window.location.href = ssoResult.data.url;
+                                return;
+                            }
+                        } catch (e) {
+                            console.error('SSO 跳转失败:', e);
+                        }
+                    }
+
+                    // 如果配置了企业微信，自动获取授权 URL
+                    if (result.data.wechat?.enabled) {
+                        try {
+                            const wechatResult = await authAPI.getWeChatAuthorizeUrl();
+                            if (wechatResult.success && wechatResult.data?.url) {
+                                // 跳转到企业微信授权页面
+                                window.location.href = wechatResult.data.url;
+                                return;
+                            }
+                        } catch (e) {
+                            console.error('企业微信跳转失败:', e);
+                        }
+                    }
+                }
+            } catch (error: any) {
+                console.error('检查登录配置失败:', error);
+                // 配置检查失败时，显示传统登录表单
+            } finally {
+                setCheckingConfig(false);
+            }
+        };
+
+        checkConfig();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // 如果正在检查配置，显示加载状态
+    if (checkingConfig) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-slate-50">
+                <div className="text-center">
+                    <Loader2 className="w-12 h-12 text-brand-600 animate-spin mx-auto mb-4" />
+                    <p className="text-slate-600">正在检查登录配置...</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50 relative overflow-hidden">
@@ -100,7 +205,7 @@ export const Login: React.FC = () => {
                                     <input 
                                         type="text" 
                                         className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all text-slate-800 text-sm"
-                                        placeholder="例如: admin"
+                                        placeholder="请输入账号"
                                         value={account}
                                         onChange={e => setAccount(e.target.value)}
                                         autoFocus
@@ -133,12 +238,9 @@ export const Login: React.FC = () => {
                         </form>
 
                         <div className="mt-8 pt-6 border-t border-slate-100 text-center">
-                            <p className="text-xs text-slate-400 mb-2">默认管理员</p>
-                            <div className="flex gap-2 justify-center flex-wrap">
-                                <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded border border-slate-200 cursor-help" title="账号">admin</span>
-                                <span className="text-xs text-slate-400 py-1">/</span>
-                                <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded border border-slate-200 cursor-help" title="密码">Gw1admin.</span>
-                            </div>
+                            <p className="text-xs text-slate-400">
+                                如需账号信息，请向管理员获取。
+                            </p>
                         </div>
                     </div>
                 </div>

@@ -22,15 +22,20 @@ export const GradingSettings: React.FC = () => {
         setGradeConfigs(newConfigs);
     };
 
-    const handleSaveGradeConfig = () => {
+    const handleSaveGradeConfig = async () => {
         const totalQuota = gradeConfigs.reduce((sum, cfg) => sum + (cfg.quota || 0), 0);
         if (totalQuota !== 100) {
             alert(`当前比例总和为 ${totalQuota}%，必须等于 100%`);
             return;
         }
 
-        saveGradeConfigs(gradeConfigs);
-        alert("绩效等级配置已保存");
+        try {
+            // 等待保存完成，确保数据已保存到服务器
+            await saveGradeConfigs(gradeConfigs);
+            alert("绩效等级配置已保存");
+        } catch (error: any) {
+            alert(error?.message ? `保存失败：${error.message}` : '保存失败，请检查网络/服务端日志');
+        }
     };
 
     const totalQuota = gradeConfigs.reduce((sum, cfg) => sum + (cfg.quota || 0), 0);

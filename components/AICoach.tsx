@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { generateOKRAdvice } from '../services/geminiService';
 import { Sparkles, X, Loader2 } from 'lucide-react';
+import { configsAPI } from '../services/api';
 
 interface AICoachProps {
     isOpen: boolean;
@@ -17,12 +18,19 @@ export const AICoach: React.FC<AICoachProps> = ({ isOpen, onClose, currentObject
 
     const handleGetAdvice = async () => {
         setLoading(true);
-        const result = await generateOKRAdvice(
-            "Company goal: Market Leadership. Dept goal: High Performance.", 
-            currentObjective
-        );
-        setAdvice(result);
-        setLoading(false);
+        try {
+            const aiRes = await configsAPI.getAI();
+            const aiConfig = aiRes.success ? aiRes.data?.config : null;
+
+            const result = await generateOKRAdvice(
+                "公司目标：市场领先；部门目标：高绩效",
+                currentObjective,
+                aiConfig
+            );
+            setAdvice(result);
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (

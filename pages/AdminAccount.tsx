@@ -15,7 +15,10 @@ export const AdminAccount: React.FC = () => {
     const [confirmPassword, setConfirmPassword] = useState('');
 
     useEffect(() => {
+        const handler = () => refreshAdmins();
+        window.addEventListener('alignflow_data_updated', handler);
         refreshAdmins();
+        return () => window.removeEventListener('alignflow_data_updated', handler);
     }, []);
 
     const refreshAdmins = () => {
@@ -42,7 +45,7 @@ export const AdminAccount: React.FC = () => {
         setIsModalOpen(true);
     };
 
-    const handleDeleteClick = (admin: User) => {
+    const handleDeleteClick = async (admin: User) => {
         if (admin.account === 'admin') {
             alert("内置系统管理员账号不可删除。");
             return;
@@ -52,13 +55,18 @@ export const AdminAccount: React.FC = () => {
             return;
         }
         if (confirm(`确定要删除管理员 "${admin.name}" 吗？此操作无法撤销。`)) {
-            deleteUser(admin.id);
-            addLog('DELETE_ADMIN', 'SYSTEM', `删除了管理员账号: ${admin.name}`);
-            refreshAdmins();
+            try {
+                // 等待删除完成，确保数据已从服务器删除
+                await deleteUser(admin.id);
+                addLog('DELETE_ADMIN', 'SYSTEM', `删除了管理员账号: ${admin.name}`);
+                refreshAdmins();
+            } catch (error: any) {
+                alert(error?.message ? `删除失败：${error.message}` : '删除失败，请检查网络/服务端日志');
+            }
         }
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!editingAdmin.name || !editingAdmin.account) {
             alert("请填写姓名和账号。");
             return;
@@ -98,11 +106,16 @@ export const AdminAccount: React.FC = () => {
             source: 'LOCAL'
         };
 
-        saveUser(finalUser);
-        addLog(isNew ? 'CREATE_ADMIN' : 'UPDATE_ADMIN', 'SYSTEM', `${isNew ? '创建' : '更新'}了管理员账号: ${finalUser.name}`);
-        
-        setIsModalOpen(false);
-        refreshAdmins();
+        try {
+            // 等待保存完成，确保数据已保存到服务器
+            await saveUser(finalUser);
+            addLog(isNew ? 'CREATE_ADMIN' : 'UPDATE_ADMIN', 'SYSTEM', `${isNew ? '创建' : '更新'}了管理员账号: ${finalUser.name}`);
+            
+            setIsModalOpen(false);
+            refreshAdmins();
+        } catch (error: any) {
+            alert(error?.message ? `保存失败：${error.message}` : '保存失败，请检查网络/服务端日志');
+        }
     };
 
     return (

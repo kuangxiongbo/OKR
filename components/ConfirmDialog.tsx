@@ -75,9 +75,24 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
                         </button>
                     )}
                     <button 
-                        onClick={() => {
-                            if (onConfirm) onConfirm();
-                            onClose();
+                        onClick={async () => {
+                            if (onConfirm) {
+                                try {
+                                    // 如果是异步函数，等待它完成
+                                    const result = onConfirm();
+                                    if (result instanceof Promise) {
+                                        await result;
+                                    }
+                                    // 等待 onConfirm 完成后再关闭对话框
+                                    onClose();
+                                } catch (error) {
+                                    // 如果 onConfirm 出错，仍然关闭对话框，让错误处理在 onConfirm 内部完成
+                                    console.error('ConfirmDialog onConfirm error:', error);
+                                    onClose();
+                                }
+                            } else {
+                                onClose();
+                            }
                         }}
                         className={`px-6 py-2 text-white rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center gap-2 ${buttonColor}`}
                     >

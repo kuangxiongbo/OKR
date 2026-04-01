@@ -7,22 +7,22 @@ import { Star, Send, User as UserIcon, Users, Edit, BarChart3, CheckCircle2, Shi
 import { ConfirmDialog } from '../components/ConfirmDialog';
 
 // Helper to get dynamic role name
-const getRoleLabel = (roleKey: string | Role, options: {value: string, label: string}[]) => {
+const getRoleLabel = (roleKey: string | Role, options: { value: string, label: string }[]) => {
     const found = options.find(r => r.value === roleKey);
     return found ? found.label : (ROLE_NAMES[roleKey as string] || roleKey);
 };
 
 // ... (ListItem Component - No changes) ...
-const ListItem: React.FC<{ 
-    okr: OKR, 
-    type: 'SELF' | 'PEER' | 'MANAGER' | 'APPROVER' | 'OBSERVER' | 'CC', 
+const ListItem: React.FC<{
+    okr: OKR,
+    type: 'SELF' | 'PEER' | 'MANAGER' | 'APPROVER' | 'OBSERVER' | 'CC',
     onSelect: (okr: OKR) => void,
-    roleOptions: {value: string, label: string}[]
+    roleOptions: { value: string, label: string }[]
 }> = ({ okr, type, onSelect, roleOptions }) => {
     let label = '查看详情';
     let statusColor = 'bg-slate-100 text-slate-600';
     let statusText = '未知状态';
-    
+
     const { l1, l2, l3 } = getApproverRoles(okr);
 
     if (type === 'SELF') {
@@ -39,22 +39,22 @@ const ListItem: React.FC<{
             statusColor = 'bg-orange-100 text-orange-700';
             statusText = `等待 ${getRoleLabel(l1 as string, roleOptions) || '上级'} 评分`;
         } else if (okr.status === OKRStatus.PENDING_L2_APPROVAL) {
-             label = '查看';
-             statusColor = 'bg-blue-50 text-blue-600';
-             statusText = `等待 ${getRoleLabel(l2 as string, roleOptions) || '二级'} 审批`;
+            label = '查看';
+            statusColor = 'bg-blue-50 text-blue-600';
+            statusText = `等待 ${getRoleLabel(l2 as string, roleOptions) || '二级'} 审批`;
         } else if (okr.status === OKRStatus.PENDING_L3_APPROVAL) {
-             label = '查看';
-             statusColor = 'bg-indigo-50 text-indigo-600';
-             statusText = `等待 ${getRoleLabel(l3 as string, roleOptions) || '三级'} 审批`;
+            label = '查看';
+            statusColor = 'bg-indigo-50 text-indigo-600';
+            statusText = `等待 ${getRoleLabel(l3 as string, roleOptions) || '三级'} 审批`;
         } else if (okr.status === OKRStatus.PENDING_ARCHIVE) {
-             label = '查看';
-             statusColor = 'bg-cyan-50 text-cyan-600';
-             statusText = '待归档';
+            label = '查看';
+            statusColor = 'bg-cyan-50 text-cyan-600';
+            statusText = '待归档';
         }
     } else if (type === 'PEER' || type === 'CC') {
-            label = '协作评估';
-            statusColor = 'bg-purple-100 text-purple-700';
-            statusText = type === 'PEER' ? '受邀评估' : '协作/抄送';
+        label = '协作评估';
+        statusColor = 'bg-purple-100 text-purple-700';
+        statusText = type === 'PEER' ? '受邀评估' : '协作/抄送';
     } else {
         label = '查看详情';
         statusText = '查看';
@@ -78,7 +78,7 @@ const ListItem: React.FC<{
                     <p className="text-sm text-slate-500">{okr.title}</p>
                 </div>
                 <div className="flex flex-col items-end gap-1">
-                     <span className={`${statusColor} text-xs px-2 py-1 rounded font-medium`}>
+                    <span className={`${statusColor} text-xs px-2 py-1 rounded font-medium`}>
                         {statusText}
                     </span>
                     {okr.finalGrade && okr.finalGrade !== FinalGrade.PENDING && canSeeResult && (
@@ -88,8 +88,8 @@ const ListItem: React.FC<{
                     )}
                 </div>
             </div>
-            
-            <button 
+
+            <button
                 onClick={() => onSelect(okr)}
                 className={`w-full py-2 font-medium rounded border flex items-center justify-center gap-2 bg-slate-50 text-slate-700 hover:bg-slate-100 border-slate-200`}
             >
@@ -106,15 +106,14 @@ const UserListPill: React.FC<{ users: User[], onClick?: (user: User) => void, em
     return (
         <div className="flex flex-wrap gap-2">
             {users.map(u => (
-                <button 
+                <button
                     key={u.id}
                     onClick={() => onClick && onClick(u)}
                     disabled={!onClick}
-                    className={`flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-full text-xs border transition-all ${
-                        onClick 
-                        ? 'bg-white border-slate-200 hover:border-brand-300 hover:shadow-sm hover:text-brand-600 cursor-pointer group' 
-                        : 'bg-slate-50 border-slate-100 text-slate-600 cursor-default'
-                    }`}
+                    className={`flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-full text-xs border transition-all ${onClick
+                            ? 'bg-white border-slate-200 hover:border-brand-300 hover:shadow-sm hover:text-brand-600 cursor-pointer group'
+                            : 'bg-slate-50 border-slate-100 text-slate-600 cursor-default'
+                        }`}
                 >
                     <img src={u.avatar} className="w-4 h-4 rounded-full" alt="" />
                     <span className="font-medium">{u.name}</span>
@@ -132,64 +131,74 @@ interface AssessmentModalProps {
     onClose: () => void;
     currentUser: User;
     allUsers: User[];
-    roleOptions: {value: string, label: string}[];
+    roleOptions: { value: string, label: string }[];
     workflows: ApprovalWorkflow[];
-    onAlert: (title: string, msg: React.ReactNode, type?: 'info'|'success'|'warning'|'danger') => void;
-    onConfirm: (title: string, msg: React.ReactNode, onConfirm: () => void, type?: 'info'|'danger'|'warning'|'success') => void;
+    onAlert: (title: string, msg: React.ReactNode, type?: 'info' | 'success' | 'warning' | 'danger') => void;
+    onConfirm: (title: string, msg: React.ReactNode, onConfirm: () => void, type?: 'info' | 'danger' | 'warning' | 'success') => void;
     onRefresh: () => void;
 }
+
+// Helper to deduce unique users from OKR list
+const getUniqueUsers = (okrs: OKR[], allUsers: User[]): User[] => {
+    const uniqueMap = new Map<string, User>();
+    okrs.forEach(o => {
+        const u = allUsers.find(user => user.id === o.userId);
+        if (u) uniqueMap.set(u.id, u);
+    });
+    return Array.from(uniqueMap.values());
+};
 
 const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onChange: setSelectedOKR, onClose, currentUser: user, allUsers, roleOptions, workflows, onAlert, onConfirm, onRefresh }) => {
     const isSelf = user.id === selectedOKR.userId;
     const isPeer = selectedOKR.peerReviewers?.includes(user.id) && !isSelf;
     const { l1, l2, l3, cc } = getApproverRoles(selectedOKR);
-    
+
     // Role Checks
     const isL1Manager = user.role === l1;
     const isL2ApproverUser = user.role === l2;
     const isL3ApproverUser = user.role === l3;
     const isCCUser = cc.includes(user.role);
-    
+
     // Executive/High Level Override: Anyone who acts as L2 or L3 in ANY workflow is considered "High Level" for Veto purposes
     const isHighLevelRole = workflows.some(w => w.approverRoleL2 === user.role || w.approverRoleL3 === user.role);
-    
+
     const isTeamOKR = selectedOKR.level === OKRLevel.DEPARTMENT;
-    
+
     // Team Primary override
     const isDeptMatch = selectedOKR.department === user.department;
-    const isPrimaryOverride = user.isPrimaryApprover && isDeptMatch && 
-                              (selectedOKR.status === OKRStatus.PENDING_ASSESSMENT_APPROVAL || 
-                               selectedOKR.status === OKRStatus.PENDING_L2_APPROVAL || 
-                               selectedOKR.status === OKRStatus.PENDING_L3_APPROVAL);
+    const isPrimaryOverride = user.isPrimaryApprover && isDeptMatch &&
+        (selectedOKR.status === OKRStatus.PENDING_ASSESSMENT_APPROVAL ||
+            selectedOKR.status === OKRStatus.PENDING_L2_APPROVAL ||
+            selectedOKR.status === OKRStatus.PENDING_L3_APPROVAL);
 
     // Permission Logic
     const canEditSelf = isSelf && (selectedOKR.status === OKRStatus.PUBLISHED) && !selectedOKR.isPerformanceArchived;
-    
-    const isAssessmentPhase = 
-        selectedOKR.status === OKRStatus.PENDING_ASSESSMENT_APPROVAL || 
-        selectedOKR.status === OKRStatus.GRADING || 
-        selectedOKR.status === OKRStatus.PENDING_L2_APPROVAL || 
+
+    const isAssessmentPhase =
+        selectedOKR.status === OKRStatus.PENDING_ASSESSMENT_APPROVAL ||
+        selectedOKR.status === OKRStatus.GRADING ||
+        selectedOKR.status === OKRStatus.PENDING_L2_APPROVAL ||
         selectedOKR.status === OKRStatus.PENDING_L3_APPROVAL;
 
     const canEditPeer = (isPeer || isCCUser) && isAssessmentPhase && !selectedOKR.isPerformanceArchived;
-    
+
     const isL1Stage = (isL1Manager && selectedOKR.status === OKRStatus.PENDING_ASSESSMENT_APPROVAL) || isPrimaryOverride;
-    
+
     // Cross Stage check: Strictly enforce workflow stage for L2/L3.
     // Executives should NOT edit unless it is explicitly their turn (L2/L3) or specific Veto stage.
-    const isCrossStage = (isL2ApproverUser && selectedOKR.status === OKRStatus.PENDING_L2_APPROVAL) || 
-                         (isL3ApproverUser && selectedOKR.status === OKRStatus.PENDING_L3_APPROVAL);
+    const isCrossStage = (isL2ApproverUser && selectedOKR.status === OKRStatus.PENDING_L2_APPROVAL) ||
+        (isL3ApproverUser && selectedOKR.status === OKRStatus.PENDING_L3_APPROVAL);
 
     const isVetoStage = isHighLevelRole && selectedOKR.status === OKRStatus.PENDING_ARCHIVE && !selectedOKR.isPerformanceArchived;
 
     // FIX: Strictly allow Detailed Grading ONLY in L1 Stage. 
     const canGradeDetails = (!user.role.includes(Role.ADMIN) && !selectedOKR.isPerformanceArchived && isL1Stage);
-    
+
     const canAdjustGrade = (!user.role.includes(Role.ADMIN) && !selectedOKR.isPerformanceArchived && (isL1Stage || isCrossStage)) || isVetoStage;
 
     const isHRBP = user.role === Role.HRBP || user.role === Role.ADMIN;
     const canArchive = isHRBP && selectedOKR.status === OKRStatus.PENDING_ARCHIVE && !selectedOKR.isPerformanceArchived;
-    
+
     const showManagerColumn = user.role === Role.ADMIN || (!isSelf && !isPeer && !isCCUser) || (isSelf && (selectedOKR.status === OKRStatus.CLOSED || selectedOKR.isPerformanceArchived));
 
     const hasCCFeedback = !!(selectedOKR.ccFeedback && selectedOKR.ccFeedback.length > 0);
@@ -201,13 +210,13 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
     let modalStatusColor = 'bg-slate-200 text-slate-700';
     if (selectedOKR.isPerformanceArchived) { modalStatusText = '绩效已归档'; modalStatusColor = 'bg-slate-800 text-white'; }
     else if (selectedOKR.status === OKRStatus.PUBLISHED) { modalStatusText = '草稿 (自评未提交)'; modalStatusColor = 'bg-gray-100 text-gray-700'; }
-    else if (selectedOKR.status === OKRStatus.PENDING_ASSESSMENT_APPROVAL) { 
+    else if (selectedOKR.status === OKRStatus.PENDING_ASSESSMENT_APPROVAL) {
         if (selectedOKR.totalScore) {
             modalStatusText = '已评分，待提交';
             modalStatusColor = 'bg-indigo-100 text-indigo-700';
         } else {
-            modalStatusText = `已提交，等待 ${getRoleLabel(l1 as string, roleOptions) || '上级'} 评分`; 
-            modalStatusColor = 'bg-orange-100 text-orange-700'; 
+            modalStatusText = `已提交，等待 ${getRoleLabel(l1 as string, roleOptions) || '上级'} 评分`;
+            modalStatusColor = 'bg-orange-100 text-orange-700';
         }
     }
     else if (selectedOKR.status === OKRStatus.PENDING_L2_APPROVAL) { modalStatusText = `等待 ${getRoleLabel(l2 as string, roleOptions) || '二级'} 审批`; modalStatusColor = 'bg-blue-100 text-blue-700'; }
@@ -225,10 +234,32 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
         setSelectedOKR(newOKR);
         setIsSaving(true);
         if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-        saveTimeoutRef.current = setTimeout(() => {
-            saveOKR(newOKR);
-            setTimeout(() => { setIsSaving(false); }, 600);
+        saveTimeoutRef.current = setTimeout(async () => {
+            try {
+                await saveOKR(newOKR);
+            } catch (error: any) {
+                onAlert('保存失败', error?.message || '未知错误', 'danger');
+            } finally {
+                setIsSaving(false);
+            }
         }, 1000);
+    };
+
+    // 立即保存（用于提交时确保数据已保存）
+    const saveImmediately = async (okr: OKR): Promise<void> => {
+        // 清除延迟保存的定时器
+        if (saveTimeoutRef.current) {
+            clearTimeout(saveTimeoutRef.current);
+            saveTimeoutRef.current = null;
+        }
+        // 立即保存
+        try {
+            await saveOKR(okr);
+        } catch (error: any) {
+            onAlert('保存失败', error?.message || '未知错误', 'danger');
+            throw error;
+        }
+        setIsSaving(false);
     };
 
     // ... (Helper Calculation Functions from original file) ...
@@ -249,14 +280,14 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
         // @ts-ignore
         kr[field] = val;
         if (field === 'selfScore') {
-             let objScore = 0;
-             newOKR.objectives[objIndex].keyResults.forEach(k => {
-                 objScore += (k.selfScore || 0) * (k.weight / 100);
-             });
-             newOKR.objectives[objIndex].selfScore = Math.round(objScore * 10) / 10;
-             const newTotal = calculateSelfScore(newOKR);
-             if (!newOKR.overallSelfAssessment) newOKR.overallSelfAssessment = { score: 0, comment: '' };
-             newOKR.overallSelfAssessment.score = newTotal;
+            let objScore = 0;
+            newOKR.objectives[objIndex].keyResults.forEach(k => {
+                objScore += (k.selfScore || 0) * (k.weight / 100);
+            });
+            newOKR.objectives[objIndex].selfScore = Math.round(objScore * 10) / 10;
+            const newTotal = calculateSelfScore(newOKR);
+            if (!newOKR.overallSelfAssessment) newOKR.overallSelfAssessment = { score: 0, comment: '' };
+            newOKR.overallSelfAssessment.score = newTotal;
         }
         updateAndSave(newOKR);
     };
@@ -317,14 +348,24 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
         updateAndSave(newOKR);
     }
 
-    const handleManagerConfirm = () => {
+    const handleManagerConfirm = async () => {
         if (isCrossStage && !selectedOKR.adjustmentReason?.trim()) {
             onAlert("提示", "跨级调整/终审必须填写说明理由。", "warning");
             return;
         }
-        saveOKR(selectedOKR); 
+        // 从缓存中获取最新的 OKR（包含更新后的版本号）
+        const okrs = getOKRs();
+        const latestOKR = okrs.find(o => o.id === selectedOKR.id);
+        if (!latestOKR) {
+            onAlert("错误", "无法找到更新后的 OKR，请刷新页面后重试。", "danger");
+            return;
+        }
+        // 使用最新的 OKR，但保留当前编辑的内容，确保版本号不被覆盖
+        const updated = { ...latestOKR, ...selectedOKR, version: latestOKR.version };
+        // 等待保存完成，确保数据已保存到服务器
+        await saveOKR(updated);
         onRefresh();
-        onClose(); 
+        onClose();
         onAlert("成功", isCrossStage ? "已暂存，请到列表页进行批量批准。" : "评估已暂存，请在列表页批量提交。", "success");
     };
 
@@ -333,12 +374,30 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
             onAlert("提示", "驳回必须填写说明理由。", "warning");
             return;
         }
-        onConfirm("确认驳回?", "将退回给一级主管重新评分。", () => {
-            saveOKR(selectedOKR);
-            updateOKRStatus(selectedOKR.id, OKRStatus.PENDING_ASSESSMENT_APPROVAL);
+        // 根据当前状态决定退回到哪个状态
+        const isFromL2OrL3 = selectedOKR.status === OKRStatus.PENDING_L2_APPROVAL ||
+            selectedOKR.status === OKRStatus.PENDING_L3_APPROVAL;
+        const targetStatus = isFromL2OrL3 ? OKRStatus.PUBLISHED : OKRStatus.PENDING_ASSESSMENT_APPROVAL;
+        const rejectMessage = isFromL2OrL3
+            ? "将退回给员工重新提交自评。"
+            : "将退回给一级主管重新评分。";
+
+        onConfirm("确认驳回?", rejectMessage, async () => {
+            // 从缓存中获取最新的 OKR（包含更新后的版本号）
+            const okrs = getOKRs();
+            const latestOKR = okrs.find(o => o.id === selectedOKR.id);
+            if (!latestOKR) {
+                onAlert("错误", "无法找到更新后的 OKR，请刷新页面后重试。", "danger");
+                return;
+            }
+            // 使用最新的 OKR，但保留当前编辑的内容，确保版本号不被覆盖
+            const updated = { ...latestOKR, ...selectedOKR, version: latestOKR.version };
+            // 等待保存完成，确保数据已保存到服务器
+            await saveOKR(updated);
+            await updateOKRStatus(selectedOKR.id, targetStatus);
             onRefresh();
             onClose();
-            onAlert("已驳回", "已退回至评分阶段。", "danger");
+            onAlert("已驳回", isFromL2OrL3 ? "已退回，员工需要重新提交自评。" : "已退回至评分阶段。", "danger");
         }, "danger");
     };
 
@@ -347,21 +406,38 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
             onAlert("提示", "行使一票否决权必须填写【调整/驳回说明】理由。", "warning");
             return;
         }
-        onConfirm("确认一票否决 (驳回)?", "该操作将强制把流程退回至【一级评分】阶段，要求重新评估。\n此操作具有最高优先级。", () => {
-             const updated = { ...selectedOKR, status: OKRStatus.PENDING_ASSESSMENT_APPROVAL };
-             saveOKR(updated);
-             onRefresh();
-             onClose();
-             onAlert("已否决", "已强制退回至评分阶段。", "danger");
+        onConfirm("确认一票否决 (驳回)?", "该操作将强制把流程退回至【一级评分】阶段，要求重新评估。\n此操作具有最高优先级。", async () => {
+            // 从缓存中获取最新的 OKR（包含更新后的版本号）
+            const okrs = getOKRs();
+            const latestOKR = okrs.find(o => o.id === selectedOKR.id);
+            if (!latestOKR) {
+                onAlert("错误", "无法找到更新后的 OKR，请刷新页面后重试。", "danger");
+                return;
+            }
+            // 使用最新的 OKR，但保留当前编辑的内容和状态，确保版本号不被覆盖
+            const updated = { ...latestOKR, ...selectedOKR, status: OKRStatus.PENDING_ASSESSMENT_APPROVAL, version: latestOKR.version };
+            // 等待保存完成，确保数据已保存到服务器
+            await saveOKR(updated);
+            onRefresh();
+            onClose();
+            onAlert("已否决", "已强制退回至评分阶段。", "danger");
         }, "danger");
     };
 
-    const handleSavePeerReview = (comment: string, grade?: string) => {
+    const handleSavePeerReview = async (comment: string, grade?: string) => {
         if (!comment.trim()) {
             onAlert("提示", "请输入评估内容。", "warning");
             return;
         }
-        const newOKR = { ...selectedOKR };
+        // 从缓存中获取最新的 OKR（包含更新后的版本号）
+        const okrs = getOKRs();
+        const latestOKR = okrs.find(o => o.id === selectedOKR.id);
+        if (!latestOKR) {
+            onAlert("错误", "无法找到更新后的 OKR，请刷新页面后重试。", "danger");
+            return;
+        }
+        // 确保版本号不被覆盖
+        const newOKR = { ...latestOKR, ...selectedOKR, version: latestOKR.version };
         if (!newOKR.ccFeedback) newOKR.ccFeedback = [];
         const existingIdx = newOKR.ccFeedback.findIndex(f => f.userId === user.id);
         const feedbackPayload = {
@@ -377,31 +453,81 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
         } else {
             newOKR.ccFeedback.push(feedbackPayload);
         }
-        saveOKR(newOKR);
-        setSelectedOKR(newOKR); 
+        // 等待保存完成，确保数据已保存到服务器
+        await saveOKR(newOKR);
+        setSelectedOKR(newOKR);
         onRefresh();
         onAlert("成功", "360 评估已提交。", "success");
     };
 
     const submitSelfAssessmentClick = () => {
         if (!selectedOKR.overallSelfAssessment?.comment?.trim()) return onAlert("提示", "请填写整体自评总结 (不能留空)。", "warning");
-        onConfirm("确认提交自评?", "提交后将直接进入上级评分阶段，提交后无法修改。", () => {
-            const updated = { ...selectedOKR, status: OKRStatus.PENDING_ASSESSMENT_APPROVAL };
-            saveOKR(updated);
-            onRefresh();
-            onClose();
-            setTimeout(() => {
-                onAlert("提交成功", "自评已提交，请等待上级评估。", "success");
-            }, 100);
+        onConfirm("确认提交自评?", "提交后将直接进入上级评分阶段，提交后无法修改。", async () => {
+            try {
+                console.log('[自评提交] 开始提交自评，OKR ID:', selectedOKR.id);
+
+                // 先立即保存当前的自评数据（确保所有待保存的数据都已保存）
+                // 使用当前的 selectedOKR，它应该包含所有最新的自评数据
+                console.log('[自评提交] 步骤1: 立即保存自评数据');
+                await saveImmediately(selectedOKR);
+                console.log('[自评提交] 步骤1完成: 自评数据已保存');
+
+                // 从缓存中获取最新的 OKR（包含更新后的版本号）
+                const okrs = getOKRs();
+                const latestOKR = okrs.find(o => o.id === selectedOKR.id);
+                if (!latestOKR) {
+                    throw new Error('无法找到更新后的 OKR');
+                }
+                console.log('[自评提交] 获取最新版本号:', latestOKR.version);
+
+                // 然后更新状态并保存（使用最新的 OKR，包含最新的版本号）
+                const updated = { ...latestOKR, status: OKRStatus.PENDING_ASSESSMENT_APPROVAL, version: latestOKR.version };
+                console.log('[自评提交] 步骤2: 更新状态并保存，新状态:', updated.status, '版本号:', updated.version);
+                // 等待保存完成，确保数据已保存到服务器
+                await saveOKR(updated);
+                console.log('[自评提交] 步骤2完成: 状态已更新并保存');
+
+                // 先关闭窗口，避免刷新数据时重新打开
+                console.log('[自评提交] 步骤3: 关闭自评窗口');
+                onClose();
+
+                // 等待一小段时间，确保窗口已关闭
+                await new Promise(resolve => setTimeout(resolve, 50));
+
+                // 刷新数据，确保获取服务器的最新状态
+                console.log('[自评提交] 步骤4: 刷新数据');
+                onRefresh();
+
+                // 显示成功提示
+                setTimeout(() => {
+                    onAlert("提交成功", "自评已提交，请等待上级评估。", "success");
+                }, 100);
+                console.log('[自评提交] 提交完成');
+            } catch (error) {
+                console.error('[自评提交] 提交失败:', error);
+                onAlert("错误", `提交自评失败: ${error instanceof Error ? error.message : '未知错误'}，请重试。`, "danger");
+                // 即使出错，也关闭窗口，避免用户卡在提交状态
+                onClose();
+            }
         }, "info");
     };
 
     const handleArchivePerformance = (deptName: string, deptOkrs: OKR[]) => {
-        onConfirm("确认绩效归档", `确认将 ${deptName} 的 ${deptOkrs.length} 个绩效进行归档发布？\n此操作将锁定评分结果，员工可查看最终定级。`, () => {
-            deptOkrs.forEach(o => {
-                const updated = { ...o, isPerformanceArchived: true, status: OKRStatus.PUBLISHED };
-                saveOKR(updated);
-            });
+        onConfirm("确认绩效归档", `确认将 ${deptName} 的 ${deptOkrs.length} 个绩效进行归档发布？\n此操作将锁定评分结果，员工可查看最终定级。`, async () => {
+            // 等待所有保存完成，确保数据已保存到服务器
+            // 归档时应该将状态设置为 CLOSED，而不是 PUBLISHED
+            await Promise.all(deptOkrs.map(async (o) => {
+                // 从缓存中获取最新的 OKR（包含更新后的版本号）
+                const okrs = getOKRs();
+                const latestOKR = okrs.find(okr => okr.id === o.id);
+                if (!latestOKR) {
+                    console.error(`无法找到 OKR: ${o.id}`);
+                    return;
+                }
+                // 确保版本号不被覆盖，状态设置为 CLOSED
+                const updated = { ...latestOKR, ...o, isPerformanceArchived: true, status: OKRStatus.CLOSED, version: latestOKR.version };
+                return saveOKR(updated);
+            }));
             onRefresh();
             onClose();
             onAlert("操作成功", `${deptName} 绩效已归档发布。`, "success");
@@ -411,9 +537,9 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
     // ... (Render Modal Content - Identical to original) ...
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
-             <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200">
                 <div className="p-6 border-b border-slate-100 flex justify-between items-start bg-slate-50 rounded-t-xl">
-                        <div>
+                    <div>
                         <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
                             绩效评估: {selectedOKR.title}
                             <span className="text-sm font-normal text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">{selectedOKR.userName}</span>
@@ -428,14 +554,14 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
                             )}
                             {isPrimaryOverride && (
                                 <span className="text-xs bg-amber-50 text-amber-700 px-2 py-1 rounded border border-amber-200 flex items-center gap-1 font-bold">
-                                    <Crown size={12}/> 团队第一负责人权限生效
+                                    <Crown size={12} /> 团队第一负责人权限生效
                                 </span>
                             )}
                         </div>
-                        </div>
-                        <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><div className="p-2 hover:bg-slate-200 rounded-full">✕</div></button>
+                    </div>
+                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><div className="p-2 hover:bg-slate-200 rounded-full">✕</div></button>
                 </div>
-                
+
                 {!showManagerColumn && isSelf && !selectedOKR.isPerformanceArchived && selectedOKR.status !== OKRStatus.PUBLISHED && (
                     <div className="bg-indigo-50 text-indigo-800 px-6 py-2 text-sm flex items-center gap-2 border-b border-indigo-100">
                         <Lock size={14} />
@@ -448,7 +574,7 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
                         <span>绩效结果已归档锁定。</span>
                     </div>
                 )}
-                
+
                 <div className="flex-1 overflow-y-auto p-8 space-y-8 relative">
                     <div className="absolute top-2 right-4 z-10">
                         {isSaving ? (
@@ -461,7 +587,7 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
                             </div>
                         )}
                     </div>
-                    
+
                     {/* Top Adjustment Explanation - REMOVED per requirement */}
 
                     {selectedOKR.level === OKRLevel.DEPARTMENT && !isSelf && (
@@ -474,17 +600,17 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
                         </div>
                     )}
 
-                    {selectedOKR.objectives.map((obj, i) => (
+                    {(selectedOKR.objectives || []).map((obj, i) => (
                         <div key={obj.id} className="border border-slate-200 rounded-lg overflow-hidden mb-6">
                             <div className="bg-slate-100 p-4 border-b border-slate-200 flex justify-between items-center">
-                                <h3 className="font-bold text-slate-800">O{i+1}: {obj.content} <span className="text-xs font-normal text-slate-500 ml-2">权重 {obj.weight}%</span></h3>
+                                <h3 className="font-bold text-slate-800">O{i + 1}: {obj.content} <span className="text-xs font-normal text-slate-500 ml-2">权重 {obj.weight}%</span></h3>
                                 {canEditSelf && <span className="text-xs text-blue-600 font-medium">当前自评: {obj.selfScore || 0}分</span>}
                             </div>
                             <div className="divide-y divide-slate-100 bg-white">
-                                {obj.keyResults.map((kr, k) => (
+                                {(obj.keyResults || []).map((kr, k) => (
                                     <div key={kr.id} className={`p-4 grid grid-cols-1 gap-6 ${showManagerColumn ? 'md:grid-cols-2' : ''}`}>
                                         <div className="bg-slate-50 p-3 rounded border border-slate-200">
-                                            <div className="text-sm font-medium text-slate-700 mb-2">KR {k+1}: {kr.content}</div>
+                                            <div className="text-sm font-medium text-slate-700 mb-2">KR {k + 1}: {kr.content}</div>
                                             <div className="flex gap-2">
                                                 <input type="number" disabled={!canEditSelf} placeholder="0" className="w-16 p-1.5 border rounded text-sm text-center font-medium text-blue-700" value={kr.selfScore ?? ''} onChange={e => updateKRSelf(i, k, 'selfScore', e.target.value)} />
                                                 <div className="flex-1 text-sm text-slate-600 bg-white p-1.5 rounded border border-slate-200 min-h-[50px] flex items-center">
@@ -510,9 +636,9 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
                             </div>
                             <div className="bg-slate-50/80 p-4 border-t border-slate-200">
                                 <div className={`grid grid-cols-1 gap-6 ${showManagerColumn ? 'md:grid-cols-2' : ''}`}>
-                                        <div className="border border-blue-100 bg-blue-50/30 rounded p-3 h-full flex flex-col">
+                                    <div className="border border-blue-100 bg-blue-50/30 rounded p-3 h-full flex flex-col">
                                         <div className="flex justify-between items-center mb-2">
-                                            <label className="text-xs font-bold text-blue-700">目标自评总结 (O{i+1})</label>
+                                            <label className="text-xs font-bold text-blue-700">目标自评总结 (O{i + 1})</label>
                                             <span className="text-sm font-bold text-blue-700">{obj.selfScore || 0} 分</span>
                                         </div>
                                         {canEditSelf ? (
@@ -520,11 +646,11 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
                                         ) : (
                                             <div className="text-sm text-slate-600 whitespace-pre-wrap bg-white p-2 rounded border border-blue-100/50 flex-1 min-h-[3rem]">{obj.selfComment || '未填写'}</div>
                                         )}
-                                        </div>
-                                        {showManagerColumn && (
-                                            <div className="border border-orange-100 bg-orange-50/30 rounded p-3 h-full flex flex-col">
+                                    </div>
+                                    {showManagerColumn && (
+                                        <div className="border border-orange-100 bg-orange-50/30 rounded p-3 h-full flex flex-col">
                                             <div className="flex justify-between items-center mb-2">
-                                                <label className="text-xs font-bold text-orange-700">上级目标评价 (O{i+1})</label>
+                                                <label className="text-xs font-bold text-orange-700">上级目标评价 (O{i + 1})</label>
                                                 <span className="text-sm font-bold text-orange-700">{obj.managerScore || 0} 分</span>
                                             </div>
                                             {canGradeDetails || canAdjustGrade ? (
@@ -532,23 +658,23 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
                                             ) : (
                                                 <div className="text-sm text-slate-600 whitespace-pre-wrap bg-white p-2 rounded border border-orange-100/50 flex-1 min-h-[3rem]">{obj.managerComment || '未填写'}</div>
                                             )}
-                                            </div>
-                                        )}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
                     ))}
 
                     <div className="bg-blue-50 p-6 rounded-lg border border-blue-200 shadow-sm mt-4">
-                        <h3 className="font-bold text-blue-900 mb-4 flex items-center gap-2"><UserCheck size={18}/> 员工整体自评</h3>
+                        <h3 className="font-bold text-blue-900 mb-4 flex items-center gap-2"><UserCheck size={18} /> 员工整体自评</h3>
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                             <div className="lg:col-span-1 space-y-4">
-                                    <div className="bg-white p-4 rounded-lg border border-blue-100 shadow-sm text-center h-full flex flex-col justify-center">
+                                <div className="bg-white p-4 rounded-lg border border-blue-100 shadow-sm text-center h-full flex flex-col justify-center">
                                     <div className="text-xs text-blue-500 uppercase font-bold mb-1">自评总分 (自动计算)</div>
                                     <div className="text-4xl font-extrabold text-blue-600">
                                         {selectedOKR.overallSelfAssessment?.score || 0}
                                     </div>
-                                    </div>
+                                </div>
                             </div>
                             <div className="lg:col-span-2">
                                 <label className="block text-sm font-medium text-blue-800 mb-2">个人自评总结</label>
@@ -562,11 +688,11 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
                     </div>
 
                     {showManagerColumn && (
-                            <div className="bg-orange-50 p-6 rounded-lg border border-orange-200 shadow-sm mt-4">
-                            <h3 className="font-bold text-orange-900 mb-4 flex items-center gap-2"><ShieldCheck size={18}/> 上级整体评价 & 定级</h3>
+                        <div className="bg-orange-50 p-6 rounded-lg border border-orange-200 shadow-sm mt-4">
+                            <h3 className="font-bold text-orange-900 mb-4 flex items-center gap-2"><ShieldCheck size={18} /> 上级整体评价 & 定级</h3>
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                                 <div className="lg:col-span-1 space-y-4">
-                                        <div className="bg-white p-4 rounded-lg border border-orange-100 shadow-sm text-center h-full flex flex-col justify-center">
+                                    <div className="bg-white p-4 rounded-lg border border-orange-100 shadow-sm text-center h-full flex flex-col justify-center">
                                         <div className="text-xs text-orange-500 uppercase font-bold mb-1">最终定级</div>
                                         {canAdjustGrade ? (
                                             <select className={`text-4xl font-extrabold text-center bg-transparent outline-none w-full ${selectedOKR.finalGrade === 'S' ? 'text-yellow-500' : selectedOKR.finalGrade === 'A' ? 'text-green-500' : 'text-blue-500'}`} value={selectedOKR.finalGrade || FinalGrade.PENDING} onChange={e => updateFinalGrade(e.target.value as FinalGrade)}>
@@ -579,18 +705,18 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
                                         ) : (
                                             <div className={`text-4xl font-extrabold flex items-center justify-center ${selectedOKR.finalGrade === 'S' ? 'text-yellow-500' : selectedOKR.finalGrade === 'A' ? 'text-green-500' : 'text-blue-500'}`}>{selectedOKR.finalGrade || FinalGrade.PENDING}</div>
                                         )}
-                                        </div>
+                                    </div>
                                 </div>
                                 <div className="lg:col-span-2">
                                     <label className="block text-sm font-medium text-orange-800 mb-2">上级总结评价</label>
-                                    {canGradeDetails || canAdjustGrade ? <textarea className="w-full p-3 border border-orange-200 rounded-lg min-h-[10rem] focus:ring-2 focus:ring-orange-500 outline-none" placeholder="请填写整体评价总结..." value={selectedOKR.overallManagerAssessment?.comment || ''} onChange={e => updateOverallManagerComment(e.target.value)}/> : <div className="w-full p-4 border border-orange-200 rounded-lg min-h-[10rem] h-auto bg-white text-slate-700 whitespace-pre-wrap">{selectedOKR.overallManagerAssessment?.comment || '未填写评价'}</div>}
+                                    {canGradeDetails || canAdjustGrade ? <textarea className="w-full p-3 border border-orange-200 rounded-lg min-h-[10rem] focus:ring-2 focus:ring-orange-500 outline-none" placeholder="请填写整体评价总结..." value={selectedOKR.overallManagerAssessment?.comment || ''} onChange={e => updateOverallManagerComment(e.target.value)} /> : <div className="w-full p-4 border border-orange-200 rounded-lg min-h-[10rem] h-auto bg-white text-slate-700 whitespace-pre-wrap">{selectedOKR.overallManagerAssessment?.comment || '未填写评价'}</div>}
                                 </div>
                             </div>
-                            
+
                             {(isCrossStage || isPrimaryOverride || selectedOKR.adjustmentReason || isVetoStage) && (
-                                    <div className="bg-purple-50 p-4 rounded-lg border border-purple-200 mt-4">
+                                <div className="bg-purple-50 p-4 rounded-lg border border-purple-200 mt-4">
                                     <h4 className="text-sm font-bold text-purple-900 mb-2 flex items-center gap-2">
-                                        <GitMerge size={16}/> 
+                                        <GitMerge size={16} />
                                         {isVetoStage ? '一票否决/调整说明' : (isTargetCadre ? '干部跨级调整说明' : '跨级/负责调整说明')}
                                         {(isCrossStage || isVetoStage) && <span className="text-[10px] bg-red-100 text-red-600 px-2 rounded-full font-bold border border-red-200">* 必填</span>}
                                     </h4>
@@ -628,7 +754,7 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
                             )}
                             {canEditPeer && (
                                 <div className="bg-purple-50 p-4 rounded border border-purple-100 shadow-sm mt-2">
-                                    <h4 className="text-sm font-bold text-purple-900 mb-2 flex items-center gap-2"><Users size={16}/> 填写您的协作评估 (360 Peer Review / CC)</h4>
+                                    <h4 className="text-sm font-bold text-purple-900 mb-2 flex items-center gap-2"><Users size={16} /> 填写您的协作评估 (360 Peer Review / CC)</h4>
                                     <textarea className="w-full p-2 text-sm border border-purple-200 rounded focus:ring-1 focus:ring-purple-500 outline-none mb-3 min-h-[4rem]" placeholder="作为协作方，请对该成员的工作表现提供反馈..." value={peerComment} onChange={e => setPeerComment(e.target.value)} />
                                     <div className="flex justify-between items-center">
                                         <div className="flex items-center gap-2">
@@ -641,7 +767,7 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
                                                 <option value={FinalGrade.C}>C</option>
                                             </select>
                                         </div>
-                                        <button onClick={() => handleSavePeerReview(peerComment, peerGrade)} className="bg-purple-600 text-white px-4 py-1.5 rounded text-xs font-bold hover:bg-purple-700 flex items-center gap-1"><Send size={12}/> 提交评估</button>
+                                        <button onClick={() => handleSavePeerReview(peerComment, peerGrade)} className="bg-purple-600 text-white px-4 py-1.5 rounded text-xs font-bold hover:bg-purple-700 flex items-center gap-1"><Send size={12} /> 提交评估</button>
                                     </div>
                                 </div>
                             )}
@@ -649,19 +775,19 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
                     )}
                 </div>
                 <div className="p-6 border-t border-slate-100 bg-slate-50 rounded-b-xl flex justify-between items-center">
-                    <div className="flex items-center gap-2">{isSaving && <span className="text-xs text-brand-600 flex items-center gap-1 animate-pulse"><CheckCircle2 size={12}/> 自动保存中...</span>}</div>
+                    <div className="flex items-center gap-2">{isSaving && <span className="text-xs text-brand-600 flex items-center gap-1 animate-pulse"><CheckCircle2 size={12} /> 自动保存中...</span>}</div>
                     <div className="flex gap-3">
                         <button onClick={onClose} className="px-4 py-2 text-slate-600 hover:bg-slate-200 rounded">关闭</button>
-                        {isSelf && canEditSelf && <button onClick={submitSelfAssessmentClick} className="px-6 py-2 bg-brand-600 text-white rounded hover:bg-brand-700 flex items-center gap-2"><Send size={16}/> 提交自评</button>}
+                        {isSelf && canEditSelf && <button onClick={submitSelfAssessmentClick} className="px-6 py-2 bg-brand-600 text-white rounded hover:bg-brand-700 flex items-center gap-2"><Send size={16} /> 提交自评</button>}
                         {isCrossStage ? (
                             <>
                                 <button onClick={handleManagerConfirm} className="px-4 py-2 bg-slate-200 text-slate-700 rounded hover:bg-slate-300 font-medium">保存 (去列表批量批准)</button>
-                                <button onClick={handleSingleReject} className="px-4 py-2 bg-white border border-red-200 text-red-600 rounded hover:bg-red-50 flex items-center gap-2 font-bold"><ThumbsDown size={16}/> 驳回</button>
+                                <button onClick={handleSingleReject} className="px-4 py-2 bg-white border border-red-200 text-red-600 rounded hover:bg-red-50 flex items-center gap-2 font-bold"><ThumbsDown size={16} /> 驳回</button>
                             </>
                         ) : (
                             (canGradeDetails || canAdjustGrade) && !isVetoStage && <button onClick={handleManagerConfirm} className="px-6 py-2 bg-brand-600 text-white rounded hover:bg-brand-700 flex items-center gap-2">保存 & 完成</button>
                         )}
-                        {isVetoStage && <button onClick={handleExecutiveVeto} className="px-4 py-2 bg-white border border-red-600 text-red-600 rounded hover:bg-red-50 flex items-center gap-2 font-bold shadow-sm"><ThumbsDown size={16}/> 一票否决 (退回重评)</button>}
+                        {isVetoStage && <button onClick={handleExecutiveVeto} className="px-4 py-2 bg-white border border-red-600 text-red-600 rounded hover:bg-red-50 flex items-center gap-2 font-bold shadow-sm"><ThumbsDown size={16} /> 一票否决 (退回重评)</button>}
                         {canArchive && <button onClick={() => { handleArchivePerformance(selectedOKR.department || '该部门', [selectedOKR]); }} className="px-6 py-2 bg-brand-600 text-white rounded hover:bg-brand-700 flex items-center gap-2 font-medium"><CheckSquare size={18} /> 绩效归档发布</button>}
                     </div>
                 </div>
@@ -676,7 +802,7 @@ export const Assessment: React.FC = () => {
     const [allUsers, setAllUsers] = useState<User[]>([]);
     const [gradeConfigs, setGradeConfigs] = useState<GradeConfiguration[]>([]);
     const [workflows, setWorkflows] = useState<ApprovalWorkflow[]>([]);
-    const [roleOptions, setRoleOptions] = useState<{value: string, label: string}[]>([]);
+    const [roleOptions, setRoleOptions] = useState<{ value: string, label: string }[]>([]);
     const [selectedOKR, setSelectedOKR] = useState<OKR | null>(null);
     const [teamViewFilterDept, setTeamViewFilterDept] = useState<string | null>(null);
 
@@ -689,14 +815,14 @@ export const Assessment: React.FC = () => {
         onConfirm?: () => void;
     }>({ isOpen: false, title: '', message: '', type: 'info', showCancel: true });
 
-    const openAlert = (title: string, message: React.ReactNode, type: 'info'|'success'|'warning'|'danger' = 'info') => {
+    const openAlert = (title: string, message: React.ReactNode, type: 'info' | 'success' | 'warning' | 'danger' = 'info') => {
         setDialog({ isOpen: true, title, message, type, showCancel: false });
     };
 
-    const openConfirm = (title: string, message: React.ReactNode, onConfirm: () => void, type: 'info'|'danger'|'warning'|'success' = 'info') => {
+    const openConfirm = (title: string, message: React.ReactNode, onConfirm: () => void, type: 'info' | 'danger' | 'warning' | 'success' = 'info') => {
         setDialog({ isOpen: true, title, message, type, showCancel: true, onConfirm });
     };
-    
+
     // Refresh Data
     const refreshData = () => {
         setOkrs(getOKRs());
@@ -714,14 +840,14 @@ export const Assessment: React.FC = () => {
     }, [user]);
 
     // DYNAMIC PERMISSIONS: Driven by Workflow Configuration
-    
+
     // 1. Is Manager/Approver: Is this user an L1, L2, or L3 approver in ANY active workflow?
     const isManagerOrApprover = useMemo(() => {
         if (user.role === Role.ADMIN) return true;
         // Check if user's role is L1, L2 or L3 in any workflow definition
-        return workflows.some(w => 
-            w.approverRoleL1 === user.role || 
-            w.approverRoleL2 === user.role || 
+        return workflows.some(w =>
+            w.approverRoleL1 === user.role ||
+            w.approverRoleL2 === user.role ||
             w.approverRoleL3 === user.role
         );
     }, [workflows, user.role]);
@@ -739,11 +865,11 @@ export const Assessment: React.FC = () => {
     // True if current user is an approver (L1/L2/L3) for ANY role that is *itself* a "Cadre" (Leader)
     const canAssessLeaders = useMemo(() => {
         if (isAdmin || user.role === Role.PRESIDENT) return true;
-        
+
         // Find workflows where I am an approver
-        const myApprovingWorkflows = workflows.filter(w => 
-            w.approverRoleL1 === user.role || 
-            w.approverRoleL2 === user.role || 
+        const myApprovingWorkflows = workflows.filter(w =>
+            w.approverRoleL1 === user.role ||
+            w.approverRoleL2 === user.role ||
             w.approverRoleL3 === user.role
         );
 
@@ -752,8 +878,8 @@ export const Assessment: React.FC = () => {
         return myApprovingWorkflows.some(w => {
             // Is the target role (e.g. VP) a leader?
             // Reuse logic from 'isCadre': check if this target role appears as an approver in ANY workflow
-            return workflows.some(checkWf => 
-                checkWf.approverRoleL1 === w.targetRole || 
+            return workflows.some(checkWf =>
+                checkWf.approverRoleL1 === w.targetRole ||
                 checkWf.approverRoleL2 === w.targetRole
             );
         });
@@ -769,7 +895,7 @@ export const Assessment: React.FC = () => {
     const isCadreRole = (r: Role | string) => workflows.some(w => w.approverRoleL1 === r || w.approverRoleL2 === r);
 
     const myOKRs = okrs.filter(o => o.userId === user.id && (
-        o.status === OKRStatus.PUBLISHED || 
+        o.status === OKRStatus.PUBLISHED ||
         o.status === OKRStatus.PENDING_ASSESSMENT_APPROVAL ||
         o.status === OKRStatus.PENDING_L2_APPROVAL ||
         o.status === OKRStatus.PENDING_L3_APPROVAL ||
@@ -780,10 +906,10 @@ export const Assessment: React.FC = () => {
     const peerOKRs = okrs.filter(o => {
         if (o.userId === user.id) return false;
         if (o.isPerformanceArchived) return false;
-        const isAssessmentPhase = 
-            o.status === OKRStatus.PENDING_ASSESSMENT_APPROVAL || 
-            o.status === OKRStatus.GRADING || 
-            o.status === OKRStatus.PENDING_L2_APPROVAL || 
+        const isAssessmentPhase =
+            o.status === OKRStatus.PENDING_ASSESSMENT_APPROVAL ||
+            o.status === OKRStatus.GRADING ||
+            o.status === OKRStatus.PENDING_L2_APPROVAL ||
             o.status === OKRStatus.PENDING_L3_APPROVAL;
         if (!isAssessmentPhase) return false;
         const isPeer = o.peerReviewers?.includes(user.id);
@@ -794,12 +920,12 @@ export const Assessment: React.FC = () => {
 
     const crossLevelManagedDepts = useMemo(() => {
         if (!isCrossLevelApprover && user.role !== Role.PRESIDENT) return new Set<string>();
-        if (isAdmin || user.role === Role.PRESIDENT) { 
+        if (isAdmin || user.role === Role.PRESIDENT) {
             return new Set(allUsers.map(u => u.department).filter(Boolean));
         }
         const depts = new Set<string>();
         allUsers.forEach(u => {
-            if (u.id === user.id) return; 
+            if (u.id === user.id) return;
             const dummyOKR: OKR = { id: 'temp', userId: u.id, userName: u.name, level: OKRLevel.PERSONAL, department: u.department, title: 'dummy', period: '', status: OKRStatus.DRAFT, objectives: [], createdAt: '' };
             const { l1, l2, l3 } = getApproverRoles(dummyOKR);
             if (l2 === user.role || l3 === user.role) {
@@ -815,22 +941,22 @@ export const Assessment: React.FC = () => {
 
     const allAccessibleTeamOKRs = isManagerOrApprover
         ? okrs.filter(o => {
-            if (o.userId === user.id) return false; 
+            if (o.userId === user.id) return false;
             if (isAdmin || user.role === Role.PRESIDENT) return true;
-            
+
             const isSubmitted = o.status !== OKRStatus.DRAFT && o.status !== OKRStatus.PENDING_MANAGER && o.status !== OKRStatus.PENDING_GM;
             if (!isSubmitted) return false;
-            
+
             const { l1, l2, l3 } = getApproverRoles(o);
             let isL1Approver = user.role === l1;
             // Strict check: if I am L1, generally I only see my dept unless I am cross-dept manager
             if (isL1Approver && isDeptHead && o.department !== user.department) isL1Approver = false;
-            
+
             const isCrossApprover = (user.role === l2 || user.role === l3);
             const isDeptView = isDeptHead && o.department === user.department;
             const isCrossDeptView = isCrossLevelApprover && crossLevelManagedDepts.has(o.department || '');
             const isPrimaryView = isTeamPrimaryLead && o.department === user.department;
-            
+
             return isL1Approver || isCrossApprover || isDeptView || isCrossDeptView || isPrimaryView;
         })
         : [];
@@ -841,13 +967,14 @@ export const Assessment: React.FC = () => {
         const targetUser = allUsers.find(u => u.id === o.userId);
         return targetUser && isLeaderUser(targetUser);
     });
-    
+
     const memberOKRs = allAccessibleTeamOKRs.filter(o => {
         const targetUser = allUsers.find(u => u.id === o.userId);
         return targetUser && !isLeaderUser(targetUser);
     });
 
-    const myActionCount = myOKRs.filter(o => o.status === OKRStatus.PUBLISHED).length;
+    // 我的绩效：只计算 PUBLISHED 状态且未归档的 OKR（需要员工提交自评的）
+    const myActionCount = myOKRs.filter(o => o.status === OKRStatus.PUBLISHED && !o.isPerformanceArchived).length;
     const collabCount = peerOKRs.length;
 
     const getActionCount = (list: OKR[]) => {
@@ -902,7 +1029,7 @@ export const Assessment: React.FC = () => {
     const pendingSelfOKRs = actionScopeOKRs.filter(o => o.status === OKRStatus.PUBLISHED);
     const pendingGradingOKRs = actionScopeOKRs.filter(o => {
         if (o.status !== OKRStatus.PENDING_ASSESSMENT_APPROVAL) return false;
-        if (o.totalScore) return false; 
+        if (o.totalScore) return false;
         if (isTeamPrimaryLead) return true;
         const { l1 } = getApproverRoles(o);
         if (user.role === Role.PRESIDENT && o.level === OKRLevel.DEPARTMENT) return true;
@@ -910,27 +1037,27 @@ export const Assessment: React.FC = () => {
     });
     const gradedPendingSubmitOKRs = actionScopeOKRs.filter(o => {
         if (o.status !== OKRStatus.PENDING_ASSESSMENT_APPROVAL) return false;
-        if (!o.totalScore) return false; 
+        if (!o.totalScore) return false;
         if (isTeamPrimaryLead) return true;
         const { l1 } = getApproverRoles(o);
         return user.role === l1;
     });
     const unifiedActionableItems = actionScopeOKRs.filter(o => {
-         const { l1, l2, l3 } = getApproverRoles(o);
-         if (user.role === l1 && o.status === OKRStatus.PENDING_ASSESSMENT_APPROVAL && o.totalScore) return true;
-         if (isTeamPrimaryLead && o.status === OKRStatus.PENDING_ASSESSMENT_APPROVAL && o.totalScore) return true;
-         if (user.role === l2 && o.status === OKRStatus.PENDING_L2_APPROVAL) return true;
-         if (user.role === l3 && o.status === OKRStatus.PENDING_L3_APPROVAL) return true;
-         if (user.role === Role.PRESIDENT && o.level === OKRLevel.DEPARTMENT && o.status === OKRStatus.PENDING_ASSESSMENT_APPROVAL) return true;
-         return false;
+        const { l1, l2, l3 } = getApproverRoles(o);
+        if (user.role === l1 && o.status === OKRStatus.PENDING_ASSESSMENT_APPROVAL && o.totalScore) return true;
+        if (isTeamPrimaryLead && o.status === OKRStatus.PENDING_ASSESSMENT_APPROVAL && o.totalScore) return true;
+        if (user.role === l2 && o.status === OKRStatus.PENDING_L2_APPROVAL) return true;
+        if (user.role === l3 && o.status === OKRStatus.PENDING_L3_APPROVAL) return true;
+        if (user.role === Role.PRESIDENT && o.level === OKRLevel.DEPARTMENT && o.status === OKRStatus.PENDING_ASSESSMENT_APPROVAL) return true;
+        return false;
     });
     const isBatchActionAllowed = pendingGradingOKRs.length === 0 && unifiedActionableItems.length > 0;
     const blockingReason = pendingGradingOKRs.length > 0 ? `还有 ${pendingGradingOKRs.length} 位成员等待评分或提交自评。` : unifiedActionableItems.length === 0 ? "没有可批量批准的项目。" : "";
-    
+
     const hasL1ActionScope = pendingSelfOKRs.length > 0 || pendingGradingOKRs.length > 0 || gradedPendingSubmitOKRs.length > 0;
-    const hasCrossActionScope = unifiedActionableItems.some(o => 
-        o.status === OKRStatus.PENDING_L2_APPROVAL || 
-        o.status === OKRStatus.PENDING_L3_APPROVAL || 
+    const hasCrossActionScope = unifiedActionableItems.some(o =>
+        o.status === OKRStatus.PENDING_L2_APPROVAL ||
+        o.status === OKRStatus.PENDING_L3_APPROVAL ||
         (user.role === Role.PRESIDENT && o.level === OKRLevel.DEPARTMENT && o.status === OKRStatus.PENDING_ASSESSMENT_APPROVAL)
     );
 
@@ -948,23 +1075,23 @@ export const Assessment: React.FC = () => {
         if (o.status !== OKRStatus.PENDING_ASSESSMENT_APPROVAL) return false;
         const { l1 } = getApproverRoles(o);
         if (user.role === l1 && !o.totalScore) return true;
-        return false; 
+        return false;
     });
 
     const leaderUnifiedActionableItems = leaderActionScopeOKRs.filter(o => {
-         const { l1, l2, l3 } = getApproverRoles(o);
-         if (user.role === l1 && o.status === OKRStatus.PENDING_ASSESSMENT_APPROVAL && o.totalScore) return true;
-         if (user.role === l2 && o.status === OKRStatus.PENDING_L2_APPROVAL) return true;
-         if (user.role === l3 && o.status === OKRStatus.PENDING_L3_APPROVAL) return true;
-         if (user.role === Role.PRESIDENT && o.level === OKRLevel.DEPARTMENT && o.status === OKRStatus.PENDING_ASSESSMENT_APPROVAL) return true;
-         return false;
+        const { l1, l2, l3 } = getApproverRoles(o);
+        if (user.role === l1 && o.status === OKRStatus.PENDING_ASSESSMENT_APPROVAL && o.totalScore) return true;
+        if (user.role === l2 && o.status === OKRStatus.PENDING_L2_APPROVAL) return true;
+        if (user.role === l3 && o.status === OKRStatus.PENDING_L3_APPROVAL) return true;
+        if (user.role === Role.PRESIDENT && o.level === OKRLevel.DEPARTMENT && o.status === OKRStatus.PENDING_ASSESSMENT_APPROVAL) return true;
+        return false;
     });
 
     const leaderBatchActionAllowed = leaderPendingGradingOKRs.length === 0 && leaderUnifiedActionableItems.length > 0;
     const leaderBlockingReason = leaderPendingGradingOKRs.length > 0 ? `还有 ${leaderPendingGradingOKRs.length} 位干部等待初评分。` : leaderUnifiedActionableItems.length === 0 ? "没有可批量批准的项目。" : "";
 
     const teamSubDepts = isCrossLevelApprover || user.role === Role.PRESIDENT ? Array.from(crossLevelManagedDepts) : Array.from(new Set(memberOKRs.map(o => o.department).filter(Boolean)));
-    const totalPoolCount = isCrossLevelApprover && !teamViewFilterDept ? memberOKRs.length : displayedMemberOKRs.length; 
+    const totalPoolCount = isCrossLevelApprover && !teamViewFilterDept ? memberOKRs.length : displayedMemberOKRs.length;
     const aggregateMemberStats = (okrList: OKR[]) => {
         return gradeConfigs.map(cfg => {
             const count = okrList.filter(o => o.finalGrade === cfg.grade).length;
@@ -977,33 +1104,72 @@ export const Assessment: React.FC = () => {
 
     // ... (Handlers) ...
     const handleUnifiedBatchApprove = (items: OKR[]) => {
-        openConfirm("确认批量批准?", `即将批准 ${items.length} 位成员的绩效评估进入下一阶段。`, () => {
-             items.forEach(okr => {
+        openConfirm("确认批量批准?", `即将批准 ${items.length} 位成员的绩效评估进入下一阶段。`, async () => {
+            // 等待所有状态更新完成，确保数据已保存到服务器
+            await Promise.all(items.map(okr => {
                 const { l2, l3 } = getApproverRoles(okr);
-                let nextStatus = OKRStatus.PENDING_ARCHIVE; 
-                if (okr.status === OKRStatus.PENDING_ASSESSMENT_APPROVAL) { if (l2) nextStatus = OKRStatus.PENDING_L2_APPROVAL; } 
+                let nextStatus = OKRStatus.PENDING_ARCHIVE;
+                if (okr.status === OKRStatus.PENDING_ASSESSMENT_APPROVAL) { if (l2) nextStatus = OKRStatus.PENDING_L2_APPROVAL; }
                 else if (okr.status === OKRStatus.PENDING_L2_APPROVAL) { if (l3) nextStatus = OKRStatus.PENDING_L3_APPROVAL; }
                 if (user.role === Role.PRESIDENT) nextStatus = OKRStatus.PENDING_ARCHIVE;
                 if (okr.status === OKRStatus.PENDING_L2_APPROVAL && !l3) nextStatus = OKRStatus.PENDING_ARCHIVE;
-                updateOKRStatus(okr.id, nextStatus);
-            });
+                return updateOKRStatus(okr.id, nextStatus);
+            }));
             refreshData();
             openAlert("批量操作成功", "已完成批准。", "success");
         }, "success");
     };
     const handleBatchRejectCrossLevel = (items: OKR[]) => {
-        openConfirm("确认批量驳回?", `即将把 ${items.length} 个评估退回给上一级重新评分。`, () => {
-             items.forEach(okr => { updateOKRStatus(okr.id, OKRStatus.PENDING_ASSESSMENT_APPROVAL); });
-             refreshData();
-             openAlert("批量操作成功", "已全部驳回至评分阶段。", "success");
+        openConfirm("确认批量驳回?", `即将把 ${items.length} 个评估退回给员工重新提交自评。`, async () => {
+            try {
+                console.log('[批量驳回] 开始批量驳回，数量:', items.length);
+                // 等待所有状态更新完成，确保数据已保存到服务器
+                await Promise.all(items.map(async (okr) => {
+                    try {
+                        // 根据当前状态决定退回到哪个状态
+                        // 如果是从 L2/L3 审批驳回，应该退回到 PUBLISHED（待提交自评）
+                        // 如果是从 PENDING_ASSESSMENT_APPROVAL 驳回，也应该退回到 PUBLISHED
+                        const targetStatus = (okr.status === OKRStatus.PENDING_L2_APPROVAL ||
+                            okr.status === OKRStatus.PENDING_L3_APPROVAL ||
+                            okr.status === OKRStatus.PENDING_ASSESSMENT_APPROVAL)
+                            ? OKRStatus.PUBLISHED
+                            : OKRStatus.PENDING_ASSESSMENT_APPROVAL;
+
+                        console.log('[批量驳回] 驳回 OKR:', okr.id, '从状态:', okr.status, '到状态:', targetStatus);
+                        await updateOKRStatus(okr.id, targetStatus);
+                        console.log('[批量驳回] OKR 驳回成功:', okr.id);
+                    } catch (error) {
+                        console.error('[批量驳回] OKR 驳回失败:', okr.id, error);
+                        throw error;
+                    }
+                }));
+                console.log('[批量驳回] 所有 OKR 驳回完成，刷新数据');
+                // 等待一小段时间，确保服务器状态已更新
+                await new Promise(resolve => setTimeout(resolve, 100));
+                refreshData();
+                openAlert("批量操作成功", "已全部驳回，员工需要重新提交自评。", "success");
+            } catch (error) {
+                console.error('[批量驳回] 批量驳回失败:', error);
+                openAlert("错误", `批量驳回失败: ${error instanceof Error ? error.message : '未知错误'}，请重试。`, "danger");
+            }
         }, "danger");
     };
     const handleArchivePerformance = (deptName: string, deptOkrs: OKR[]) => {
-        openConfirm("确认绩效归档", `确认将 ${deptName} 的 ${deptOkrs.length} 个绩效进行归档发布？`, () => {
-            deptOkrs.forEach(o => {
-                const updated = { ...o, isPerformanceArchived: true, status: OKRStatus.PUBLISHED };
-                saveOKR(updated);
-            });
+        openConfirm("确认绩效归档", `确认将 ${deptName} 的 ${deptOkrs.length} 个绩效进行归档发布？`, async () => {
+            // 等待所有保存完成，确保数据已保存到服务器
+            // 归档时应该将状态设置为 CLOSED，而不是 PUBLISHED
+            await Promise.all(deptOkrs.map(async (o) => {
+                // 从缓存中获取最新的 OKR（包含更新后的版本号）
+                const okrs = getOKRs();
+                const latestOKR = okrs.find(okr => okr.id === o.id);
+                if (!latestOKR) {
+                    console.error(`无法找到 OKR: ${o.id}`);
+                    return;
+                }
+                // 确保版本号不被覆盖，状态设置为 CLOSED
+                const updated = { ...latestOKR, ...o, isPerformanceArchived: true, status: OKRStatus.CLOSED, version: latestOKR.version };
+                return saveOKR(updated);
+            }));
             refreshData();
             openAlert("操作成功", `${deptName} 绩效已归档发布。`, "success");
         }, "success");
@@ -1015,8 +1181,8 @@ export const Assessment: React.FC = () => {
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-6 animate-in fade-in slide-in-from-bottom-2">
                 <div className="p-4 bg-slate-50 border-b border-slate-200">
                     <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                         <div className="w-1 h-4 bg-brand-500 rounded-full"></div> {title}
-                         <span className="ml-auto text-xs bg-white border border-slate-200 px-2 py-0.5 rounded-full text-slate-500 font-normal">{list.length} 人</span>
+                        <div className="w-1 h-4 bg-brand-500 rounded-full"></div> {title}
+                        <span className="ml-auto text-xs bg-white border border-slate-200 px-2 py-0.5 rounded-full text-slate-500 font-normal">{list.length} 人</span>
                     </h3>
                     {subtitle && <p className="text-xs text-slate-500 mt-1 pl-3">{subtitle}</p>}
                 </div>
@@ -1026,46 +1192,47 @@ export const Assessment: React.FC = () => {
                         const { l1, l2, l3 } = getApproverRoles(okr);
                         let isMyTurn = false;
                         if (okr.status === OKRStatus.PENDING_ASSESSMENT_APPROVAL) {
-                             if (user.role === l1) isMyTurn = true;
-                             if (user.isPrimaryApprover && okr.department === user.department) isMyTurn = true;
-                             if (user.role === Role.PRESIDENT && okr.level === OKRLevel.DEPARTMENT) isMyTurn = true;
+                            if (user.role === l1) isMyTurn = true;
+                            if (user.isPrimaryApprover && okr.department === user.department) isMyTurn = true;
+                            if (user.role === Role.PRESIDENT && okr.level === OKRLevel.DEPARTMENT) isMyTurn = true;
                         } else if (okr.status === OKRStatus.PENDING_L2_APPROVAL) {
-                             if (user.role === l2) isMyTurn = true;
+                            if (user.role === l2) isMyTurn = true;
                         } else if (okr.status === OKRStatus.PENDING_L3_APPROVAL) {
-                             if (user.role === l3) isMyTurn = true;
+                            if (user.role === l3) isMyTurn = true;
                         }
 
                         const btnText = isMyTurn ? "评估" : "查看";
-                        const btnClass = isMyTurn 
-                            ? "bg-brand-600 text-white border-brand-600 hover:bg-brand-700 shadow-sm" 
+                        const btnClass = isMyTurn
+                            ? "bg-brand-600 text-white border-brand-600 hover:bg-brand-700 shadow-sm"
                             : "bg-white border-slate-200 text-slate-600 hover:bg-brand-50 hover:text-brand-600 hover:border-brand-200";
 
                         return (
-                        <div key={okr.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors group">
-                            <div className="flex items-center gap-3">
-                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm shadow-sm ${okr.finalGrade === 'S' ? 'bg-yellow-100 text-yellow-700 border border-yellow-200' : okr.finalGrade === 'A' ? 'bg-green-100 text-green-700 border border-green-200' : okr.finalGrade === 'B' ? 'bg-blue-100 text-blue-700 border border-blue-200' : okr.finalGrade === 'C' ? 'bg-slate-100 text-slate-600 border border-slate-300' : 'bg-slate-50 text-slate-400 border border-slate-200' }`}>{okr.finalGrade || '-'}</div>
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-sm font-bold text-slate-800">{okr.userName}</span>
-                                        <span className="text-[10px] text-slate-500 bg-white border border-slate-200 px-1.5 rounded">{okr.department}</span>
-                                        {okr.isPerformanceArchived && <Lock size={10} className="text-slate-400"/>}
-                                    </div>
-                                    <div className="text-xs text-slate-500 truncate max-w-[200px] md:max-w-xs">{okr.title}</div>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <div className="text-right hidden md:block">
-                                    <div className="text-[10px] text-slate-400 uppercase">Status</div>
-                                    <div className={`text-xs font-bold ${okr.status === OKRStatus.PUBLISHED ? 'text-slate-500' : okr.status === OKRStatus.PENDING_ARCHIVE ? 'text-cyan-600' : okr.isPerformanceArchived ? 'text-slate-800' : 'text-orange-600'}`}>
-                                         {okr.status === OKRStatus.PENDING_ASSESSMENT_APPROVAL ? '待评分' : okr.status === OKRStatus.PENDING_L2_APPROVAL ? '待二级审批' : okr.status === OKRStatus.PENDING_L3_APPROVAL ? '待三级审批' : okr.status === OKRStatus.PENDING_ARCHIVE ? '待归档' : okr.isPerformanceArchived ? '已归档' : '草稿/自评中'}
+                            <div key={okr.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors group">
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm shadow-sm ${okr.finalGrade === 'S' ? 'bg-yellow-100 text-yellow-700 border border-yellow-200' : okr.finalGrade === 'A' ? 'bg-green-100 text-green-700 border border-green-200' : okr.finalGrade === 'B' ? 'bg-blue-100 text-blue-700 border border-blue-200' : okr.finalGrade === 'C' ? 'bg-slate-100 text-slate-600 border border-slate-300' : 'bg-slate-50 text-slate-400 border border-slate-200'}`}>{okr.finalGrade || '-'}</div>
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm font-bold text-slate-800">{okr.userName}</span>
+                                            <span className="text-[10px] text-slate-500 bg-white border border-slate-200 px-1.5 rounded">{okr.department}</span>
+                                            {okr.isPerformanceArchived && <Lock size={10} className="text-slate-400" />}
+                                        </div>
+                                        <div className="text-xs text-slate-500 truncate max-w-[200px] md:max-w-xs">{okr.title}</div>
                                     </div>
                                 </div>
-                                <button onClick={() => setSelectedOKR(okr)} className={`px-4 py-1.5 rounded text-xs font-bold transition-colors border ${btnClass}`}>
-                                    {btnText}
-                                </button>
+                                <div className="flex items-center gap-3">
+                                    <div className="text-right hidden md:block">
+                                        <div className="text-[10px] text-slate-400 uppercase">Status</div>
+                                        <div className={`text-xs font-bold ${okr.status === OKRStatus.PUBLISHED ? 'text-slate-500' : okr.status === OKRStatus.PENDING_ARCHIVE ? 'text-cyan-600' : okr.isPerformanceArchived ? 'text-slate-800' : 'text-orange-600'}`}>
+                                            {okr.status === OKRStatus.PENDING_ASSESSMENT_APPROVAL ? '待评分' : okr.status === OKRStatus.PENDING_L2_APPROVAL ? '待二级审批' : okr.status === OKRStatus.PENDING_L3_APPROVAL ? '待三级审批' : okr.status === OKRStatus.PENDING_ARCHIVE ? '待归档' : okr.isPerformanceArchived ? '已归档' : '草稿/自评中'}
+                                        </div>
+                                    </div>
+                                    <button onClick={() => setSelectedOKR(okr)} className={`px-4 py-1.5 rounded text-xs font-bold transition-colors border ${btnClass}`}>
+                                        {btnText}
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                    )})}
+                        )
+                    })}
                 </div>
             </div>
         );
@@ -1074,14 +1241,24 @@ export const Assessment: React.FC = () => {
     return (
         // ... (Return JSX - Identical to original file) ...
         <div className="space-y-8 animate-in fade-in duration-300">
-            <ConfirmDialog isOpen={dialog.isOpen} onClose={() => setDialog({ ...dialog, isOpen: false })} onConfirm={dialog.onConfirm} title={dialog.title} message={dialog.message} type={dialog.type} showCancel={dialog.showCancel} />
+            <ConfirmDialog
+                isOpen={dialog.isOpen}
+                onClose={() => {
+                    setDialog({ ...dialog, isOpen: false, onConfirm: undefined });
+                }}
+                onConfirm={dialog.onConfirm}
+                title={dialog.title}
+                message={dialog.message}
+                type={dialog.type}
+                showCancel={dialog.showCancel}
+            />
 
             <div>
-                 <h1 className="text-2xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+                <h1 className="text-2xl font-bold text-slate-900 mb-6 flex items-center gap-2">
                     <Star className="text-orange-500" /> 绩效评估中心
-                 </h1>
-                 <div className="flex border-b border-slate-200 gap-2 overflow-x-auto">
-                     <button onClick={() => setActiveTab('MY_SELF')} className={`px-4 py-3 font-medium text-sm transition-colors border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === 'MY_SELF' ? 'border-brand-600 text-brand-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+                </h1>
+                <div className="flex border-b border-slate-200 gap-2 overflow-x-auto">
+                    <button onClick={() => setActiveTab('MY_SELF')} className={`px-4 py-3 font-medium text-sm transition-colors border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === 'MY_SELF' ? 'border-brand-600 text-brand-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
                         我的绩效 {myActionCount > 0 && <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full min-w-[18px] text-center font-bold">{myActionCount}</span>}
                     </button>
                     <button onClick={() => setActiveTab('COLLABORATION')} className={`px-4 py-3 font-medium text-sm transition-colors border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === 'COLLABORATION' ? 'border-brand-600 text-brand-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
@@ -1103,11 +1280,11 @@ export const Assessment: React.FC = () => {
                         </button>
                     )}
                     {isHRBP && (
-                         <button onClick={() => setActiveTab('ARCHIVE')} className={`px-4 py-3 font-medium text-sm transition-colors border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === 'ARCHIVE' ? 'border-brand-600 text-brand-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+                        <button onClick={() => setActiveTab('ARCHIVE')} className={`px-4 py-3 font-medium text-sm transition-colors border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === 'ARCHIVE' ? 'border-brand-600 text-brand-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
                             归档发布 <span className="bg-red-100 text-red-600 px-2 py-0.5 rounded-full text-xs">{pendingArchiveOKRs.length}</span>
                         </button>
                     )}
-                 </div>
+                </div>
             </div>
 
             {/* TAB: MY SELF */}
@@ -1120,24 +1297,24 @@ export const Assessment: React.FC = () => {
 
             {/* TAB: COLLABORATION */}
             {activeTab === 'COLLABORATION' && (
-                 <div className="space-y-4 animate-in fade-in slide-in-from-left-4">
-                     <div className="flex items-center gap-2 text-sm text-purple-600 bg-purple-50 p-3 rounded mb-4 border border-purple-100">
-                         <MessageCircle size={16}/> <span>以下是您受邀参与协作评估 (Peer Review) 或抄送 (CC) 的目标。请提供您的反馈意见。</span>
-                     </div>
-                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="space-y-4 animate-in fade-in slide-in-from-left-4">
+                    <div className="flex items-center gap-2 text-sm text-purple-600 bg-purple-50 p-3 rounded mb-4 border border-purple-100">
+                        <MessageCircle size={16} /> <span>以下是您受邀参与协作评估 (Peer Review) 或抄送 (CC) 的目标。请提供您的反馈意见。</span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {peerOKRs.length === 0 && <p className="text-slate-400 italic text-sm p-4 col-span-full">暂无受邀协作记录。</p>}
                         {peerOKRs.map(okr => <ListItem key={okr.id} okr={okr} type={getApproverRoles(okr).cc.includes(user.role) ? "CC" : "PEER"} onSelect={setSelectedOKR} roleOptions={roleOptions} />)}
-                     </div>
-                 </div>
+                    </div>
+                </div>
             )}
 
             {/* TAB: TEAM MEMBERS (ICs) */}
             {activeTab === 'TEAM_MEMBERS' && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-left-4">
-                     {(isCrossLevelApprover || user.role === Role.PRESIDENT || teamSubDepts.length > 1) && (
+                    {(isCrossLevelApprover || user.role === Role.PRESIDENT || teamSubDepts.length > 1) && (
                         <div className="flex gap-2 overflow-x-auto pb-2 border-b border-slate-100 mb-6 no-scrollbar">
                             <button onClick={() => setTeamViewFilterDept(null)} className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap border ${!teamViewFilterDept ? 'bg-slate-800 text-white border-slate-800 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>
-                                <LayoutGrid size={12} className="inline mr-1 mb-0.5"/> 总览
+                                <LayoutGrid size={12} className="inline mr-1 mb-0.5" /> 总览
                             </button>
                             {teamSubDepts.map(dept => (
                                 <button key={dept} onClick={() => setTeamViewFilterDept(dept)} className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap border ${teamViewFilterDept === dept ? 'bg-brand-600 text-white border-brand-600 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>
@@ -1153,36 +1330,36 @@ export const Assessment: React.FC = () => {
                             <div className="p-4 border-b border-slate-200 flex items-center justify-between gap-3 bg-white">
                                 <div className="flex items-center gap-3">
                                     <div className={`p-2 rounded-lg ${isTeamPrimaryLead ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
-                                        {isTeamPrimaryLead ? <Crown size={20}/> : <Briefcase size={20}/>}
+                                        {isTeamPrimaryLead ? <Crown size={20} /> : <Briefcase size={20} />}
                                     </div>
                                     <div><h3 className="font-bold text-lg text-slate-800">{isTeamPrimaryLead ? '审批确认 (第一责任人)' : '审批确认 (直属团队)'}</h3></div>
                                 </div>
-                                {isTeamPrimaryLead && <div className="text-xs bg-amber-50 text-amber-700 px-3 py-1 rounded-full border border-amber-200 flex items-center gap-1"><ShieldCheck size={12}/> 全员审批权限已激活</div>}
+                                {isTeamPrimaryLead && <div className="text-xs bg-amber-50 text-amber-700 px-3 py-1 rounded-full border border-amber-200 flex items-center gap-1"><ShieldCheck size={12} /> 全员审批权限已激活</div>}
                             </div>
                             <div className={`p-6 grid grid-cols-1 md:grid-cols-2 gap-8 divide-y md:divide-y-0 md:divide-x divide-slate-100`}>
                                 <div className="space-y-6">
-                                    <div className="flex items-center gap-2 mb-2 pb-2 border-b border-slate-100"><UserCog size={16} className="text-slate-500"/><h4 className="font-bold text-slate-700 text-sm uppercase tracking-wide">团队成员进度</h4></div>
+                                    <div className="flex items-center gap-2 mb-2 pb-2 border-b border-slate-100"><UserCog size={16} className="text-slate-500" /><h4 className="font-bold text-slate-700 text-sm uppercase tracking-wide">团队成员进度</h4></div>
                                     <div className="space-y-2">
                                         <div className="flex justify-between items-center text-sm"><span className="text-slate-600 font-medium flex items-center gap-2"><div className={`w-1.5 h-1.5 rounded-full ${pendingSelfOKRs.length > 0 ? 'bg-red-500' : 'bg-slate-300'}`}></div> 待员工自评 ({pendingSelfOKRs.length})</span></div>
-                                        <UserListPill users={pendingSelfOKRs.map(o => allUsers.find(u => u.id === o.userId)).filter(Boolean) as User[]} emptyText="无待办"/>
+                                        <UserListPill users={getUniqueUsers(pendingSelfOKRs, allUsers)} emptyText="无待办" />
                                     </div>
                                     <div className="space-y-2">
                                         <div className="flex justify-between items-center text-sm"><span className="text-slate-600 font-medium flex items-center gap-2"><div className={`w-1.5 h-1.5 rounded-full ${pendingGradingOKRs.length > 0 ? 'bg-orange-500' : 'bg-slate-300'}`}></div> 待您评分 ({pendingGradingOKRs.length})</span></div>
-                                        <UserListPill users={pendingGradingOKRs.map(o => allUsers.find(u => u.id === o.userId)).filter(Boolean) as User[]} onClick={(u) => { const targetOKR = pendingGradingOKRs.find(o => o.userId === u.id); if(targetOKR) setSelectedOKR(targetOKR); }} actionLabel="去评分" emptyText="无待办"/>
+                                        <UserListPill users={getUniqueUsers(pendingGradingOKRs, allUsers)} onClick={(u) => { const targetOKR = pendingGradingOKRs.find(o => o.userId === u.id); if (targetOKR) setSelectedOKR(targetOKR); }} actionLabel="去评分" emptyText="无待办" />
                                     </div>
                                     <div className="space-y-2">
                                         <div className="flex justify-between items-center text-sm"><span className="text-slate-600 font-medium flex items-center gap-2"><div className={`w-1.5 h-1.5 rounded-full ${gradedPendingSubmitOKRs.length > 0 ? 'bg-indigo-500' : 'bg-slate-300'}`}></div> 已评分，待提交 ({gradedPendingSubmitOKRs.length})</span></div>
-                                        <UserListPill users={gradedPendingSubmitOKRs.map(o => allUsers.find(u => u.id === o.userId)).filter(Boolean) as User[]} onClick={(u) => { const targetOKR = gradedPendingSubmitOKRs.find(o => o.userId === u.id); if(targetOKR) setSelectedOKR(targetOKR); }} actionLabel="重新评估" emptyText="无待办"/>
+                                        <UserListPill users={getUniqueUsers(gradedPendingSubmitOKRs, allUsers)} onClick={(u) => { const targetOKR = gradedPendingSubmitOKRs.find(o => o.userId === u.id); if (targetOKR) setSelectedOKR(targetOKR); }} actionLabel="重新评估" emptyText="无待办" />
                                     </div>
                                 </div>
                                 <div className="space-y-4 pt-4 md:pt-0 pl-0 md:pl-8 flex flex-col">
-                                    <div className="flex items-center gap-2 mb-2 pb-2 border-b border-slate-100"><ShieldCheck size={16} className="text-indigo-600"/><h4 className="font-bold text-slate-700 text-sm uppercase tracking-wide">审批提交</h4></div>
+                                    <div className="flex items-center gap-2 mb-2 pb-2 border-b border-slate-100"><ShieldCheck size={16} className="text-indigo-600" /><h4 className="font-bold text-slate-700 text-sm uppercase tracking-wide">审批提交</h4></div>
                                     <div className="flex-1 bg-indigo-50/40 rounded-xl border border-indigo-100 p-5 flex flex-col justify-between">
                                         <div>
                                             {!isBatchActionAllowed ? (
-                                                <div className="flex flex-col gap-3"><div className="flex items-start gap-2 text-orange-600 bg-orange-50 p-3 rounded-lg border border-orange-100"><AlertTriangle size={18} className="mt-0.5 flex-shrink-0"/><span className="text-sm font-medium">{blockingReason}</span></div><p className="text-xs text-slate-500">请先处理左侧的待办事项，确保所有成员完成评估后方可批量批准。</p></div>
+                                                <div className="flex flex-col gap-3"><div className="flex items-start gap-2 text-orange-600 bg-orange-50 p-3 rounded-lg border border-orange-100"><AlertTriangle size={18} className="mt-0.5 flex-shrink-0" /><span className="text-sm font-medium">{blockingReason}</span></div><p className="text-xs text-slate-500">请先处理左侧的待办事项，确保所有成员完成评估后方可批量批准。</p></div>
                                             ) : (
-                                                <div className="space-y-4"><div className="flex items-center gap-2 text-indigo-700 font-bold"><CheckCircle2 size={20} className="text-indigo-600"/><span>可以提交/批准 ({unifiedActionableItems.length} 人)</span></div><div className="bg-white/60 rounded p-3 border border-indigo-50"><p className="text-xs text-slate-500 mb-2">以下成员已完成评估，确认无误后提交：</p><UserListPill users={unifiedActionableItems.map(o => allUsers.find(u => u.id === o.userId)).filter(Boolean) as User[]} /></div></div>
+                                                <div className="space-y-4"><div className="flex items-center gap-2 text-indigo-700 font-bold"><CheckCircle2 size={20} className="text-indigo-600" /><span>可以提交/批准 ({unifiedActionableItems.length} 人)</span></div><div className="bg-white/60 rounded p-3 border border-indigo-50"><p className="text-xs text-slate-500 mb-2">以下成员已完成评估，确认无误后提交：</p><UserListPill users={getUniqueUsers(unifiedActionableItems, allUsers)} /></div></div>
                                             )}
                                         </div>
                                         <div className="mt-6 pt-4 border-t border-indigo-100 flex gap-3">
@@ -1207,16 +1384,16 @@ export const Assessment: React.FC = () => {
             {/* TAB: TEAM OVERVIEW (Charts & Dept Cards) */}
             {activeTab === 'TEAM_OVERVIEW' && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-left-4">
-                     <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-xl flex items-start gap-3">
-                        <div className="bg-indigo-200 text-indigo-800 p-2 rounded-lg"><PieChart size={20}/></div>
+                    <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-xl flex items-start gap-3">
+                        <div className="bg-indigo-200 text-indigo-800 p-2 rounded-lg"><PieChart size={20} /></div>
                         <div>
                             <h3 className="font-bold text-indigo-900">直属 & 跨级团队概览</h3>
                             <p className="text-sm text-indigo-800 mt-1">查看团队整体绩效分布情况及各子部门的提交进度。此视图仅包含已提交审批的数据。</p>
                         </div>
-                     </div>
+                    </div>
 
-                     {/* Stats Dashboard */}
-                     {currentDistStats.length > 0 && (
+                    {/* Stats Dashboard */}
+                    {currentDistStats.length > 0 && (
                         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                             <div className="flex justify-between items-start mb-6">
                                 <h3 className="font-bold text-slate-800 flex items-center gap-2"><BarChart3 size={18} /> {teamViewFilterDept ? `${teamViewFilterDept} 等级分布` : '团队整体等级分布'}</h3>
@@ -1230,7 +1407,7 @@ export const Assessment: React.FC = () => {
                                             <div className="flex flex-col items-end"><span className="text-xs text-slate-500 font-mono">目标: {stat.targetCount}人</span><span className="text-[10px] text-slate-400">({stat.quota}%)</span></div>
                                         </div>
                                         <div className="text-2xl font-bold text-slate-800 mb-1">{stat.count} <span className="text-sm font-normal text-slate-400">/ {stat.targetCount}</span></div>
-                                        <div className="w-full h-1.5 bg-white rounded-full mt-2 overflow-hidden border border-slate-100"><div className={`h-full ${stat.isOver ? 'bg-red-500' : 'bg-brand-500'}`} style={{width: `${Math.min(100, (stat.count / (totalPoolCount || 1)) * 100)}%`}}></div></div>
+                                        <div className="w-full h-1.5 bg-white rounded-full mt-2 overflow-hidden border border-slate-100"><div className={`h-full ${stat.isOver ? 'bg-red-500' : 'bg-brand-500'}`} style={{ width: `${Math.min(100, (stat.count / (totalPoolCount || 1)) * 100)}%` }}></div></div>
                                         {stat.isOver && <div className="text-[10px] text-red-500 mt-1 font-bold">超出配额</div>}
                                     </div>
                                 ))}
@@ -1250,7 +1427,7 @@ export const Assessment: React.FC = () => {
                                 const overLimit = stats.find(s => s.isOver);
 
                                 return (
-                                    <div key={dept} onClick={() => { if(isSubmitted) { setTeamViewFilterDept(dept); setActiveTab('TEAM_MEMBERS'); } }} className={`relative overflow-hidden rounded-xl border p-5 transition-all ${isSubmitted ? 'bg-white border-slate-200 shadow-sm hover:shadow-md hover:border-brand-300 cursor-pointer group' : 'bg-slate-50 border-slate-200 opacity-70 cursor-not-allowed'}`}>
+                                    <div key={dept} onClick={() => { if (isSubmitted) { setTeamViewFilterDept(dept); setActiveTab('TEAM_MEMBERS'); } }} className={`relative overflow-hidden rounded-xl border p-5 transition-all ${isSubmitted ? 'bg-white border-slate-200 shadow-sm hover:shadow-md hover:border-brand-300 cursor-pointer group' : 'bg-slate-50 border-slate-200 opacity-70 cursor-not-allowed'}`}>
                                         <div className="flex justify-between items-start mb-4">
                                             <div><h4 className={`font-bold text-lg ${isSubmitted ? 'text-slate-800 group-hover:text-brand-600' : 'text-slate-500'}`}>{dept}</h4><p className="text-xs text-slate-500 mt-1">成员: {deptUsersCount} 人</p></div>
                                             <span className={`px-2 py-1 rounded text-xs font-bold border ${isSubmitted ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>{isSubmitted ? '已提交 (待终审)' : '未提交'}</span>
@@ -1261,10 +1438,10 @@ export const Assessment: React.FC = () => {
                                                 <div className="grid grid-cols-4 gap-1 text-center mb-4">{stats.map(s => (<div key={s.grade} className="bg-slate-50 rounded p-1"><div className="text-[10px] text-slate-400 font-bold">{s.grade}</div><div className={`text-sm font-bold ${s.isOver ? 'text-red-500' : 'text-slate-700'}`}>{s.count}</div></div>))}</div>
                                             </>
                                         ) : (
-                                            <div className="h-16 flex items-center justify-center text-xs text-slate-400 border border-dashed border-slate-200 rounded mb-4 bg-slate-50/50"><div className="flex items-center gap-1"><Lock size={12}/> 等待一级主管提交</div></div>
+                                            <div className="h-16 flex items-center justify-center text-xs text-slate-400 border border-dashed border-slate-200 rounded mb-4 bg-slate-50/50"><div className="flex items-center gap-1"><Lock size={12} /> 等待一级主管提交</div></div>
                                         )}
                                         {overLimit && isSubmitted && <div className="flex items-center gap-1 text-xs text-red-600 bg-red-50 px-2 py-1.5 rounded mb-2"><AlertTriangle size={12} /><span>{overLimit.grade} 级比例超标</span></div>}
-                                        {isSubmitted ? <div className="text-xs font-bold text-brand-600 flex items-center justify-end gap-1 mt-2">查看详情 <ArrowRight size={12}/></div> : <div className="text-xs text-slate-400 flex items-center justify-end gap-1 mt-2"><Lock size={12}/> 暂无权限查看</div>}
+                                        {isSubmitted ? <div className="text-xs font-bold text-brand-600 flex items-center justify-end gap-1 mt-2">查看详情 <ArrowRight size={12} /></div> : <div className="text-xs text-slate-400 flex items-center justify-end gap-1 mt-2"><Lock size={12} /> 暂无权限查看</div>}
                                     </div>
                                 );
                             })}
@@ -1275,33 +1452,33 @@ export const Assessment: React.FC = () => {
 
             {/* TAB: TEAM LEADERS (Cadres) */}
             {activeTab === 'TEAM_LEADERS' && (
-                 <div className="space-y-6 animate-in fade-in slide-in-from-left-4">
+                <div className="space-y-6 animate-in fade-in slide-in-from-left-4">
                     {(leaderActionScopeOKRs.length > 0 || leaderUnifiedActionableItems.length > 0) && (
                         <div className={`border rounded-xl shadow-sm mb-6 overflow-hidden bg-white border-purple-200`}>
                             <div className="p-4 border-b border-slate-200 flex items-center justify-between gap-3 bg-white">
                                 <div className="flex items-center gap-3">
                                     <div className="p-2 rounded-lg bg-purple-100 text-purple-600">
-                                        <Crown size={20}/>
+                                        <Crown size={20} />
                                     </div>
                                     <div><h3 className="font-bold text-lg text-slate-800">干部绩效审批 (批量处理)</h3></div>
                                 </div>
                             </div>
                             <div className={`p-6 grid grid-cols-1 md:grid-cols-2 gap-8 divide-y md:divide-y-0 md:divide-x divide-slate-100`}>
                                 <div className="space-y-6">
-                                    <div className="flex items-center gap-2 mb-2 pb-2 border-b border-slate-100"><UserCog size={16} className="text-slate-500"/><h4 className="font-bold text-slate-700 text-sm uppercase tracking-wide">待评估干部</h4></div>
+                                    <div className="flex items-center gap-2 mb-2 pb-2 border-b border-slate-100"><UserCog size={16} className="text-slate-500" /><h4 className="font-bold text-slate-700 text-sm uppercase tracking-wide">待评估干部</h4></div>
                                     <div className="space-y-2">
                                         <div className="flex justify-between items-center text-sm"><span className="text-slate-600 font-medium flex items-center gap-2"><div className={`w-1.5 h-1.5 rounded-full ${leaderPendingGradingOKRs.length > 0 ? 'bg-orange-500' : 'bg-slate-300'}`}></div> 待评分/初审 ({leaderPendingGradingOKRs.length})</span></div>
-                                        <UserListPill users={leaderPendingGradingOKRs.map(o => allUsers.find(u => u.id === o.userId)).filter(Boolean) as User[]} onClick={(u) => { const targetOKR = leaderPendingGradingOKRs.find(o => o.userId === u.id); if(targetOKR) setSelectedOKR(targetOKR); }} actionLabel="去评估" emptyText="无待办"/>
+                                        <UserListPill users={getUniqueUsers(leaderPendingGradingOKRs, allUsers)} onClick={(u) => { const targetOKR = leaderPendingGradingOKRs.find(o => o.userId === u.id); if (targetOKR) setSelectedOKR(targetOKR); }} actionLabel="去评估" emptyText="无待办" />
                                     </div>
                                 </div>
                                 <div className="space-y-4 pt-4 md:pt-0 pl-0 md:pl-8 flex flex-col">
-                                    <div className="flex items-center gap-2 mb-2 pb-2 border-b border-slate-100"><ShieldCheck size={16} className="text-indigo-600"/><h4 className="font-bold text-slate-700 text-sm uppercase tracking-wide">审批提交</h4></div>
+                                    <div className="flex items-center gap-2 mb-2 pb-2 border-b border-slate-100"><ShieldCheck size={16} className="text-indigo-600" /><h4 className="font-bold text-slate-700 text-sm uppercase tracking-wide">审批提交</h4></div>
                                     <div className="flex-1 bg-purple-50/40 rounded-xl border border-purple-100 p-5 flex flex-col justify-between">
                                         <div>
                                             {!leaderBatchActionAllowed ? (
-                                                <div className="flex flex-col gap-3"><div className="flex items-start gap-2 text-orange-600 bg-orange-50 p-3 rounded-lg border border-orange-100"><AlertTriangle size={18} className="mt-0.5 flex-shrink-0"/><span className="text-sm font-medium">{leaderBlockingReason}</span></div><p className="text-xs text-slate-500">请先处理左侧的待办事项，完成所有初评后方可批量批准。</p></div>
+                                                <div className="flex flex-col gap-3"><div className="flex items-start gap-2 text-orange-600 bg-orange-50 p-3 rounded-lg border border-orange-100"><AlertTriangle size={18} className="mt-0.5 flex-shrink-0" /><span className="text-sm font-medium">{leaderBlockingReason}</span></div><p className="text-xs text-slate-500">请先处理左侧的待办事项，完成所有初评后方可批量批准。</p></div>
                                             ) : (
-                                                <div className="space-y-4"><div className="flex items-center gap-2 text-purple-700 font-bold"><CheckCircle2 size={20} className="text-purple-600"/><span>可以提交/批准 ({leaderUnifiedActionableItems.length} 人)</span></div><div className="bg-white/60 rounded p-3 border border-purple-50"><p className="text-xs text-slate-500 mb-2">以下干部已完成评估，确认无误后提交：</p><UserListPill users={leaderUnifiedActionableItems.map(o => allUsers.find(u => u.id === o.userId)).filter(Boolean) as User[]} /></div></div>
+                                                <div className="space-y-4"><div className="flex items-center gap-2 text-purple-700 font-bold"><CheckCircle2 size={20} className="text-purple-600" /><span>可以提交/批准 ({leaderUnifiedActionableItems.length} 人)</span></div><div className="bg-white/60 rounded p-3 border border-purple-50"><p className="text-xs text-slate-500 mb-2">以下干部已完成评估，确认无误后提交：</p><UserListPill users={getUniqueUsers(leaderUnifiedActionableItems, allUsers)} /></div></div>
                                             )}
                                         </div>
                                         <div className="mt-6 pt-4 border-t border-purple-100 flex gap-3">
@@ -1317,7 +1494,7 @@ export const Assessment: React.FC = () => {
                     )}
 
                     <div className="flex items-center gap-3 mb-4">
-                        <div className="bg-purple-100 text-purple-600 p-2 rounded-lg"><UserCog size={20}/></div>
+                        <div className="bg-purple-100 text-purple-600 p-2 rounded-lg"><UserCog size={20} /></div>
                         <div>
                             <h3 className="font-bold text-slate-800 text-lg">直属管理者 (干部) 列表</h3>
                             <p className="text-xs text-slate-500">以下为您管理的一级部门负责人。作为上级，您可对其进行评估或跨级调整。</p>
@@ -1325,51 +1502,52 @@ export const Assessment: React.FC = () => {
                     </div>
                     {leaderOKRs.length === 0 && <div className="p-10 text-center bg-white rounded-xl border border-dashed border-slate-300 text-slate-400 mt-6">暂无干部评估数据。</div>}
                     {renderTable(leaderOKRs, "管理者列表")}
-                 </div>
+                </div>
             )}
-            
+
             {/* TAB: ARCHIVE */}
             {activeTab === 'ARCHIVE' && isHRBP && (
-                 <div className="space-y-6 animate-in fade-in slide-in-from-left-4">
+                <div className="space-y-6 animate-in fade-in slide-in-from-left-4">
                     <div className="flex justify-between items-center bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                         <div>
-                             <h3 className="font-bold text-slate-800 text-lg mb-1">归档发布中心</h3>
-                             <p className="text-slate-500 text-sm">将所有已完成上级评分 (待归档) 的 OKR 按部门统一发布，发布后员工可查看结果。</p>
-                         </div>
+                        <div>
+                            <h3 className="font-bold text-slate-800 text-lg mb-1">归档发布中心</h3>
+                            <p className="text-slate-500 text-sm">将所有已完成上级评分 (待归档) 的 OKR 按部门统一发布，发布后员工可查看结果。</p>
+                        </div>
                     </div>
                     {Object.keys(pendingArchiveByDept).length === 0 && <div className="p-10 text-center bg-white rounded-xl border border-dashed border-slate-300 text-slate-400">当前没有等待归档的记录。</div>}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {Object.entries(pendingArchiveByDept).map(([deptName, val]) => {
                             const deptOkrs = val as OKR[];
                             return (
-                            <div key={deptName} className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition-shadow">
-                                <div className="flex justify-between items-start mb-4">
-                                    <div className="flex items-center gap-2"><div className="bg-cyan-100 text-cyan-600 p-2 rounded-lg"><Building size={20} /></div><div><h4 className="font-bold text-slate-800">{deptName}</h4><p className="text-xs text-slate-500">待归档: {deptOkrs.length} 人</p></div></div>
+                                <div key={deptName} className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition-shadow">
+                                    <div className="flex justify-between items-start mb-4">
+                                        <div className="flex items-center gap-2"><div className="bg-cyan-100 text-cyan-600 p-2 rounded-lg"><Building size={20} /></div><div><h4 className="font-bold text-slate-800">{deptName}</h4><p className="text-xs text-slate-500">待归档: {deptOkrs.length} 人</p></div></div>
+                                    </div>
+                                    <div className="space-y-2 mb-4">
+                                        {deptOkrs.slice(0, 3).map(okr => <div key={okr.id} className="flex justify-between text-xs text-slate-600 bg-slate-50 p-2 rounded"><span>{okr.userName}</span><span className="font-bold text-indigo-600">{okr.finalGrade} ({okr.totalScore})</span></div>)}
+                                        {deptOkrs.length > 3 && <div className="text-center text-xs text-slate-400">... 以及其他 {deptOkrs.length - 3} 人</div>}
+                                    </div>
+                                    <button onClick={() => handleArchivePerformance(deptName, deptOkrs)} className="w-full bg-cyan-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-cyan-700 flex items-center justify-center gap-2 transition-colors"><CheckSquare size={16} /> 绩效归档发布</button>
                                 </div>
-                                <div className="space-y-2 mb-4">
-                                    {deptOkrs.slice(0, 3).map(okr => <div key={okr.id} className="flex justify-between text-xs text-slate-600 bg-slate-50 p-2 rounded"><span>{okr.userName}</span><span className="font-bold text-indigo-600">{okr.finalGrade} ({okr.totalScore})</span></div>)}
-                                    {deptOkrs.length > 3 && <div className="text-center text-xs text-slate-400">... 以及其他 {deptOkrs.length - 3} 人</div>}
-                                </div>
-                                <button onClick={() => handleArchivePerformance(deptName, deptOkrs)} className="w-full bg-cyan-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-cyan-700 flex items-center justify-center gap-2 transition-colors"><CheckSquare size={16} /> 绩效归档发布</button>
-                            </div>
-                        )})}
+                            )
+                        })}
                     </div>
-                 </div>
+                </div>
             )}
 
             {/* Render Assessment Modal if Selected */}
             {selectedOKR && (
-                <AssessmentModal 
-                    okr={selectedOKR} 
-                    onChange={setSelectedOKR} 
-                    onClose={() => setSelectedOKR(null)} 
-                    currentUser={user} 
+                <AssessmentModal
+                    okr={selectedOKR}
+                    onChange={setSelectedOKR}
+                    onClose={() => setSelectedOKR(null)}
+                    currentUser={user}
                     allUsers={allUsers}
                     roleOptions={roleOptions}
                     workflows={workflows}
-                    onAlert={openAlert} 
-                    onConfirm={openConfirm} 
-                    onRefresh={refreshData} 
+                    onAlert={openAlert}
+                    onConfirm={openConfirm}
+                    onRefresh={refreshData}
                 />
             )}
         </div>
