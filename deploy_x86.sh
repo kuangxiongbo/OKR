@@ -56,6 +56,7 @@ docker buildx build \
   --platform "${PLATFORM}" \
   --build-arg NODE_IMAGE="${NODE_IMG}" \
   -t "${REGISTRY}/${BACKEND_IMAGE}:${TAG}" \
+  -t "${REGISTRY}/${BACKEND_IMAGE}:latest" \
   "./backend" \
   --push
 echo "✅ 后端推送完成: ${REGISTRY}/${BACKEND_IMAGE}:${TAG}"
@@ -69,6 +70,7 @@ docker buildx build \
   --build-arg NGINX_IMAGE="${NGINX_IMG}" \
   --build-arg VITE_API_BASE_URL=/api \
   -t "${REGISTRY}/${FRONTEND_IMAGE}:${TAG}" \
+  -t "${REGISTRY}/${FRONTEND_IMAGE}:latest" \
   "." \
   --push
 echo "✅ 前端推送完成: ${REGISTRY}/${FRONTEND_IMAGE}:${TAG}"

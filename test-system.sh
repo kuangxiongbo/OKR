@@ -61,12 +61,13 @@ fi
 # 测试前端
 echo ""
 echo "5. 测试前端服务..."
-FRONTEND_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000)
+FRONTEND_PORT=${FRONTEND_PORT:-3000}
+FRONTEND_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:${FRONTEND_PORT})
 if [[ $FRONTEND_STATUS == "200" ]]; then
-    echo "✅ 前端服务运行正常"
+    echo "✅ 前端服务正常 (http://localhost:${FRONTEND_PORT})"
 else
-    echo "⚠️  前端服务未运行 (HTTP $FRONTEND_STATUS)"
-    echo "   请运行: npm run dev"
+    echo "⚠️  前端服务响应异常 (HTTP $FRONTEND_STATUS)"
+    echo "   如果是在容器内运行且映射到 80，请尝试: FRONTEND_PORT=80 ./test-system.sh"
 fi
 
 echo ""
