@@ -5,10 +5,15 @@ import { useCurrentUser } from '../hooks/useCurrentUser';
 import { OKRStatus, OKRLevel, OKR, Role } from '../types';
 import { OKRCard } from '../components/OKRCard';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { OKRAlignmentGuideModal } from '../components/OKRAlignmentGuideModal';
 import { Users, Building, ArrowLeft, Filter, LayoutGrid, RotateCcw, Eye } from 'lucide-react';
+
+const ALIGN_GUIDE_NEVER_KEY = (userId: string) => `okr_align_guide_never_${userId}`;
+const ALIGN_GUIDE_SESSION_KEY = (userId: string) => `okr_align_guide_session_${userId}`;
 
 export const Dashboard: React.FC = () => {
     const user = useCurrentUser();
+    const [showAlignmentGuide, setShowAlignmentGuide] = useState(false);
     const [selectedDept, setSelectedDept] = useState<string | null>(null);
     const [allOKRs, setAllOKRs] = useState<OKR[]>([]);
     const [dialog, setDialog] = useState<{
@@ -53,6 +58,26 @@ export const Dashboard: React.FC = () => {
         refreshData();
         return () => window.removeEventListener('alignflow_data_updated', handler);
     }, [user]);
+
+    useEffect(() => {
+        if (!user?.id) return;
+        if (localStorage.getItem(ALIGN_GUIDE_NEVER_KEY(user.id)) === '1') return;
+        if (sessionStorage.getItem(ALIGN_GUIDE_SESSION_KEY(user.id)) === '1') return;
+        setShowAlignmentGuide(true);
+    }, [user?.id]);
+
+    const handleAlignmentGuideClose = ({ neverShowAgain }: { neverShowAgain: boolean }) => {
+        if (!user?.id) {
+            setShowAlignmentGuide(false);
+            return;
+        }
+        if (neverShowAgain) {
+            localStorage.setItem(ALIGN_GUIDE_NEVER_KEY(user.id), '1');
+        } else {
+            sessionStorage.setItem(ALIGN_GUIDE_SESSION_KEY(user.id), '1');
+        }
+        setShowAlignmentGuide(false);
+    };
 
     const handleRevokeRequest = (okr: OKR, e: React.MouseEvent) => {
         // Prevent default button behavior
@@ -124,6 +149,7 @@ export const Dashboard: React.FC = () => {
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500 pb-10 relative">
+            <OKRAlignmentGuideModal isOpen={showAlignmentGuide} onClose={handleAlignmentGuideClose} />
             <ConfirmDialog 
                 isOpen={dialog.isOpen}
                 onClose={() => setDialog({ ...dialog, isOpen: false })}

@@ -30,7 +30,7 @@ cd ..
 # 测试登录API
 echo ""
 echo "3. 测试登录API..."
-LOGIN_RESPONSE=$(curl -s -X POST http://localhost:3001/api/auth/login \
+LOGIN_RESPONSE=$(curl -s -X POST http://localhost:3001/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"account":"admin","password":"Gw1admin."}')
 if [[ $LOGIN_RESPONSE == *"success\":true"* ]]; then
@@ -46,7 +46,7 @@ fi
 # 测试获取用户API
 echo ""
 echo "4. 测试获取用户API..."
-USERS_RESPONSE=$(curl -s -X GET http://localhost:3001/api/users \
+USERS_RESPONSE=$(curl -s -X GET http://localhost:3001/api/v1/users \
   -H "Authorization: Bearer $TOKEN")
 if [[ $USERS_RESPONSE == *"success\":true"* ]]; then
     echo "✅ 获取用户API正常"

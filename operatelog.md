@@ -1,5 +1,16 @@
 # 操作日志
 
+## 2026-04-07
+
+- **`Dockerfile`（前端构建）**：增加 `COPY utils/ ./utils/`，修复容器内 `vite build` 无法解析 `pages/Approvals.tsx` 等对 `../utils/okrScope` 的引用导致镜像构建失败的问题。
+- **私有仓库镜像**：执行 `REGISTRY_PREFIX=192.168.210.90:6000/library ./deploy_x86.sh v2026.04.07`，将 `192.168.210.90:6000/okr-backend` 与 `okr-frontend` 以标签 `v2026.04.07` 及 `latest` 推送（若本机 Docker 曾未在 default context，需先 `docker context use default`）。
+- **`public/OKR.png`**：自用户提供的参考图复制入库，用于首页对齐规则说明弹窗。
+- **`components/OKRAlignmentGuideModal.tsx`**：新增首页引导弹窗，展示对齐示意图；支持「下次不再提示」（按用户 ID 写入 `localStorage`）；未勾选时在同一会话内用 `sessionStorage` 关闭后不再反复弹出，下次打开浏览器可再次提示。
+- **`pages/Dashboard.tsx`**：登录后进入 OKR 看板时按上述规则弹出引导（每用户独立、可永久关闭）。
+- **`utils/okrScope.ts`**：根据 `OKR.level` 区分 **团队 OKR**（公司/部门级）与 **个人 OKR**。
+- **`pages/Approvals.tsx`**：定稿审批卡片、详情弹窗与制定建议卡片中展示 **OKR 类型**（团队/个人）。
+- **`pages/Assessment.tsx`**：绩效列表项、评估弹窗与团队审批表格行中展示 **OKR 类型**（团队/个人）。
+
 ## 2026-03-31
 
 - **`components/OKRCard.tsx`（公司级看板也可展开）**：放宽“查看全部内容”按钮条件为“只要存在目标就显示”，确保公司级 OKR 卡片（即使只有 1-2 个 Objective、标题较短）也能展开查看全部内容与 KR 详情。

@@ -3,7 +3,8 @@
 import React, { useEffect, useState } from 'react';
 import { getOKRs, updateOKRStatus, getApproverRoles, getUsers, saveOKR } from '../services/okrService';
 import { useCurrentUser } from '../hooks/useCurrentUser';
-import { OKR, OKRStatus, Role, ROLE_NAMES, User, FinalGrade } from '../types';
+import { OKR, OKRStatus, Role, ROLE_NAMES, User, FinalGrade, OKRLevel } from '../types';
+import { getOKRScopeTypeLabel } from '../utils/okrScope';
 import { Check, X, Workflow, ShieldAlert, Users, MessageSquare, FileText, ClipboardList, Send, Copy, MessageCircle, Clock, Calendar, Search } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 
@@ -312,10 +313,13 @@ const ApprovalDetailModal = ({ okr, allUsers, onClose, onApprove, onReject }: an
             <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
                 <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                     <div>
-                        <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                        <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2 flex-wrap">
                             OKR 详情
                             <span className="text-xs font-normal bg-brand-50 text-brand-600 px-2 py-0.5 rounded border border-brand-100 uppercase">
-                                {okr.level === 'COMPANY' ? '公司级' : okr.level === 'DEPARTMENT' ? '部门级' : '个人级'}
+                                {okr.level === OKRLevel.COMPANY ? '公司级' : okr.level === OKRLevel.DEPARTMENT ? '部门级' : '个人级'}
+                            </span>
+                            <span className={`text-xs font-bold px-2 py-0.5 rounded border ${okr.level === OKRLevel.PERSONAL ? 'bg-violet-50 text-violet-700 border-violet-100' : 'bg-teal-50 text-teal-800 border-teal-100'}`}>
+                                {getOKRScopeTypeLabel(okr)}
                             </span>
                         </h2>
                         <p className="text-slate-500 text-sm mt-0.5">{okr.userName} · {okr.department || '无部门'} · {okr.period}</p>
@@ -444,6 +448,9 @@ const ApprovalCard = ({ okr, type, onApprove, onReject, onDetails, allUsers = []
                     <span className={`text-xs px-2 py-0.5 rounded border ${type === 'ASSESSMENT' ? 'bg-orange-50 text-orange-600 border-orange-100' : 'bg-indigo-50 text-indigo-600 border-indigo-100'}`}>
                         {type === 'ASSESSMENT' ? '自评审批' : 'OKR 定稿审批'}
                     </span>
+                    <span className={`text-xs px-2 py-0.5 rounded border font-bold ${okr.level === OKRLevel.PERSONAL ? 'bg-violet-50 text-violet-700 border-violet-100' : 'bg-teal-50 text-teal-800 border-teal-100'}`}>
+                        {getOKRScopeTypeLabel(okr)}
+                    </span>
                 </div>
                 <h3 className="text-md font-medium text-brand-700 mb-4">{okr.title}</h3>
 
@@ -561,6 +568,9 @@ const FeedbackCard: React.FC<FeedbackCardProps> = ({ okr, currentUser, onSubmitF
                                     <Calendar size={10} /> {okr.period}
                                 </span>
                                 <span className={`text-xs px-2 py-0.5 rounded font-bold ${badgeColor}`}>{label}</span>
+                                <span className={`text-xs px-2 py-0.5 rounded font-bold border ${okr.level === OKRLevel.PERSONAL ? 'bg-violet-50 text-violet-700 border-violet-100' : 'bg-teal-50 text-teal-800 border-teal-100'}`}>
+                                    {getOKRScopeTypeLabel(okr)}
+                                </span>
                             </div>
                             <p className="text-sm text-slate-600 font-medium">{okr.title}</p>
                         </div>

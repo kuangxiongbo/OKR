@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { getOKRs, saveOKR, calculateOKRTotalScore, calculateObjScoreFromKRs, determineGrade, getGradeConfigs, getUsers, updateOKRStatus, getApproverRoles, getWorkflows, isCadre, getRoles } from '../services/okrService';
 import { useCurrentUser } from '../hooks/useCurrentUser';
 import { OKR, OKRStatus, Role, FinalGrade, GradeConfiguration, User, ApprovalWorkflow, ROLE_NAMES, OKRLevel } from '../types';
+import { getOKRScopeTypeLabel } from '../utils/okrScope';
 import { Star, Send, User as UserIcon, Users, Edit, BarChart3, CheckCircle2, ShieldCheck, UserCheck, CheckSquare, AlertTriangle, Lock, UserCog, PieChart, GitMerge, Crown, ArrowRight, MessageCircle, LayoutGrid, Briefcase, Loader2, Building, ChevronRight, Cloud, CloudFog, Eye, ThumbsUp, ThumbsDown, ClipboardList, Calendar } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 
@@ -72,7 +73,7 @@ const ListItem: React.FC<{
                         <span className="text-xs text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full border border-brand-100 flex items-center gap-1 font-normal">
                             <Calendar size={10} /> {okr.period}
                         </span>
-                        {okr.level === OKRLevel.DEPARTMENT && <span className="bg-blue-100 text-blue-700 text-[10px] px-1.5 py-0.5 rounded">团队/业务线</span>}
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded border font-bold ${okr.level === OKRLevel.PERSONAL ? 'bg-violet-50 text-violet-700 border-violet-100' : 'bg-teal-50 text-teal-800 border-teal-100'}`}>{getOKRScopeTypeLabel(okr)}</span>
                         {okr.isPerformanceArchived && (
                             <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200 font-normal">绩效已定稿</span>
                         )}
@@ -552,9 +553,9 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
                         </h2>
                         <div className="flex items-center gap-4 mt-2">
                             <span className={`px-2 py-1 rounded text-xs font-bold ${modalStatusColor}`}>{modalStatusText}</span>
-                            {selectedOKR.level === OKRLevel.DEPARTMENT && (
-                                <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded border border-blue-200 font-bold">团队/业务线目标</span>
-                            )}
+                            <span className={`text-xs px-2 py-1 rounded border font-bold ${selectedOKR.level === OKRLevel.PERSONAL ? 'bg-violet-50 text-violet-700 border-violet-100' : 'bg-teal-50 text-teal-800 border-teal-100'}`}>
+                                {getOKRScopeTypeLabel(selectedOKR)}
+                            </span>
                             {selectedOKR.totalScore !== undefined && showManagerColumn && (
                                 <span className="text-sm font-bold text-indigo-600">最终评级: {selectedOKR.finalGrade || '待定'}</span>
                             )}
@@ -1217,9 +1218,10 @@ export const Assessment: React.FC = () => {
                                 <div className="flex items-center gap-3">
                                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm shadow-sm ${okr.finalGrade === 'S' ? 'bg-yellow-100 text-yellow-700 border border-yellow-200' : okr.finalGrade === 'A' ? 'bg-green-100 text-green-700 border border-green-200' : okr.finalGrade === 'B' ? 'bg-blue-100 text-blue-700 border border-blue-200' : okr.finalGrade === 'C' ? 'bg-slate-100 text-slate-600 border border-slate-300' : 'bg-slate-50 text-slate-400 border border-slate-200'}`}>{okr.finalGrade || '-'}</div>
                                     <div>
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2 flex-wrap">
                                             <span className="text-sm font-bold text-slate-800">{okr.userName}</span>
                                             <span className="text-[10px] text-slate-500 bg-white border border-slate-200 px-1.5 rounded">{okr.department}</span>
+                                            <span className={`text-[10px] px-1.5 py-0.5 rounded border font-bold ${okr.level === OKRLevel.PERSONAL ? 'bg-violet-50 text-violet-700 border-violet-100' : 'bg-teal-50 text-teal-800 border-teal-100'}`}>{getOKRScopeTypeLabel(okr)}</span>
                                             {okr.isPerformanceArchived && <Lock size={10} className="text-slate-400" />}
                                         </div>
                                         <div className="text-xs text-slate-500 truncate max-w-[200px] md:max-w-xs">{okr.title}</div>

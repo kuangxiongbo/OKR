@@ -15,6 +15,7 @@ COPY index.html tsconfig.json vite.config.ts ./
 COPY App.tsx index.tsx types.ts ./
 COPY components/ ./components/
 COPY hooks/ ./hooks/
+COPY utils/ ./utils/
 COPY pages/ ./pages/
 COPY services/ ./services/
 COPY public/ ./public/
