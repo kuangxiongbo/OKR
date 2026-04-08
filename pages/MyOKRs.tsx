@@ -378,10 +378,11 @@ export const MyOKRs: React.FC = () => {
                 textContent: importText || undefined,
                 fileName: importFileName || undefined,
                 mimeType: importMimeType,
-                imageBase64: importImageBase64,
+                // 多图走 imageList 即可；勿再带 imageBase64，避免同一张图重复占体积、易触发网关/上游限流
+                imageBase64: importImages.length > 0 ? undefined : importImageBase64,
                 imageList: importImages.length > 0 ? importImages : undefined,
-                    fileBase64: importFileBase64,
-                    importLevel
+                fileBase64: importFileBase64,
+                importLevel
             });
             refreshData();
             setImportModalOpen(false);

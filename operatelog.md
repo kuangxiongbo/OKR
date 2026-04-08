@@ -2,6 +2,9 @@
 
 ## 2026-04-07
 
+- **私有仓库镜像（二次发布）**：执行 `REGISTRY_PREFIX=192.168.210.90:6000/library ./deploy_x86.sh v2026.04.07.2`，推送 `192.168.210.90:6000/okr-backend` 与 `okr-frontend` 的标签 `v2026.04.07.2` 及 `latest`（含 AI 导入 Nginx 请求体上限与前端去重 `imageBase64` 等改动）。
+- **`nginx.conf`**：增加 `client_max_body_size 35m`，避免 AI 导入多图（base64 JSON）超过 Nginx 默认 **1MB** 请求体上限时出现 **413 / “too large”**；与后端 `express.json({ limit: '30mb' })` 对齐留余量。
+- **`pages/MyOKRs.tsx`（AI 导入）**：多图时仅提交 `imageList`，不再同时提交重复的 `imageBase64`（原逻辑每张图都会 `setImportImageBase64`，最后一张与列表重复），减小请求体积。
 - **`Dockerfile`（前端构建）**：增加 `COPY utils/ ./utils/`，修复容器内 `vite build` 无法解析 `pages/Approvals.tsx` 等对 `../utils/okrScope` 的引用导致镜像构建失败的问题。
 - **私有仓库镜像**：执行 `REGISTRY_PREFIX=192.168.210.90:6000/library ./deploy_x86.sh v2026.04.07`，将 `192.168.210.90:6000/okr-backend` 与 `okr-frontend` 以标签 `v2026.04.07` 及 `latest` 推送（若本机 Docker 曾未在 default context，需先 `docker context use default`）。
 - **`public/OKR.png`**：自用户提供的参考图复制入库，用于首页对齐规则说明弹窗。
