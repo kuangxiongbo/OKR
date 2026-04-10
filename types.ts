@@ -243,6 +243,8 @@ export interface OKR {
   peerFeedback?: PeerFeedback[]; // 360 Feedback
   ccFeedback?: CCFeedback[]; // CC Role Feedback
   adjustmentReason?: string; // L2/L3/Cross-level adjustment reason
+  /** 审批驳回时填写，在「我的 OKR」状态旁展示 */
+  statusRejectReason?: string;
 
   isPerformanceArchived?: boolean; // New: Indicates performance assessment is finalized independently of OKR status
   version?: number;

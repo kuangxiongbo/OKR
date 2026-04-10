@@ -912,6 +912,12 @@ export const MyOKRs: React.FC = () => {
                                         </label>
                                     )}
                                     <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${statusColor}`}>{statusLabel}</span>
+                                    {okr.statusRejectReason?.trim() && (
+                                        <div className="max-w-[min(100%,20rem)] text-xs text-red-800 bg-red-50 border border-red-100 rounded-lg px-2.5 py-2 text-left">
+                                            <div className="font-bold text-[10px] uppercase tracking-wide text-red-600 mb-1">驳回说明</div>
+                                            <p className="whitespace-pre-wrap break-words leading-snug">{okr.statusRejectReason.trim()}</p>
+                                        </div>
+                                    )}
                                     {okrs.length > 1 && (
                                         <div className="flex items-center gap-1">
                                             <button

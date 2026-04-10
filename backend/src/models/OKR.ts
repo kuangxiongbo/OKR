@@ -18,6 +18,7 @@ export interface OKRRow {
   total_score?: number;
   final_grade?: string;
   adjustment_reason?: string;
+  status_reject_reason?: string | null;
   is_performance_archived: boolean;
   objectives: any;
   overall_self_assessment?: any;
@@ -153,6 +154,10 @@ export class OKRModel {
       updates.push(`adjustment_reason = $${paramIndex++}`);
       values.push(okr.adjustmentReason || null);
     }
+    if ((okr as any).statusRejectReason !== undefined) {
+      updates.push(`status_reject_reason = $${paramIndex++}`);
+      values.push((okr as any).statusRejectReason ?? null);
+    }
     if (okr.isPerformanceArchived !== undefined) {
       updates.push(`is_performance_archived = $${paramIndex++}`);
       values.push(okr.isPerformanceArchived);
@@ -241,6 +246,7 @@ export class OKRModel {
       totalScore: row.total_score ? parseFloat(row.total_score) : undefined,
       finalGrade: row.final_grade as FinalGrade,
       adjustmentReason: row.adjustment_reason,
+      statusRejectReason: row.status_reject_reason ?? undefined,
       isPerformanceArchived: row.is_performance_archived || false,
       objectives: typeof row.objectives === 'string' ? JSON.parse(row.objectives) : row.objectives,
       overallSelfAssessment: row.overall_self_assessment 

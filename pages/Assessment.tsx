@@ -6,6 +6,7 @@ import { OKR, OKRStatus, Role, FinalGrade, GradeConfiguration, User, ApprovalWor
 import { getOKRScopeTypeLabel } from '../utils/okrScope';
 import { Star, Send, User as UserIcon, Users, Edit, BarChart3, CheckCircle2, ShieldCheck, UserCheck, CheckSquare, AlertTriangle, Lock, UserCog, PieChart, GitMerge, Crown, ArrowRight, MessageCircle, LayoutGrid, Briefcase, Loader2, Building, ChevronRight, Cloud, CloudFog, Eye, ThumbsUp, ThumbsDown, ClipboardList, Calendar } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { RejectReasonDialog } from '../components/RejectReasonDialog';
 
 // Helper to get dynamic role name
 const getRoleLabel = (roleKey: string | Role, options: { value: string, label: string }[]) => {
@@ -231,6 +232,7 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
     const myPeerFeedback = selectedOKR.ccFeedback?.find(f => f.userId === user.id);
     const [peerComment, setPeerComment] = useState(myPeerFeedback?.comment || '');
     const [peerGrade, setPeerGrade] = useState<string>(myPeerFeedback?.recommendedGrade || '');
+    const [assessmentRejectOpen, setAssessmentRejectOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const saveTimeoutRef = useRef<any>(null);
 
@@ -374,35 +376,31 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
     };
 
     const handleSingleReject = () => {
-        if (!selectedOKR.adjustmentReason?.trim()) {
-            onAlert("提示", "驳回必须填写说明理由。", "warning");
-            return;
-        }
-        // 根据当前状态决定退回到哪个状态
+        setAssessmentRejectOpen(true);
+    };
+
+    const confirmAssessmentReject = async (reason: string) => {
         const isFromL2OrL3 = selectedOKR.status === OKRStatus.PENDING_L2_APPROVAL ||
             selectedOKR.status === OKRStatus.PENDING_L3_APPROVAL;
         const targetStatus = isFromL2OrL3 ? OKRStatus.PUBLISHED : OKRStatus.PENDING_ASSESSMENT_APPROVAL;
-        const rejectMessage = isFromL2OrL3
-            ? "将退回给员工重新提交自评。"
-            : "将退回给一级主管重新评分。";
-
-        onConfirm("确认驳回?", rejectMessage, async () => {
-            // 从缓存中获取最新的 OKR（包含更新后的版本号）
-            const okrs = getOKRs();
-            const latestOKR = okrs.find(o => o.id === selectedOKR.id);
-            if (!latestOKR) {
-                onAlert("错误", "无法找到更新后的 OKR，请刷新页面后重试。", "danger");
-                return;
-            }
-            // 使用最新的 OKR，但保留当前编辑的内容，确保版本号不被覆盖
-            const updated = { ...latestOKR, ...selectedOKR, version: latestOKR.version };
-            // 等待保存完成，确保数据已保存到服务器
-            await saveOKR(updated);
-            await updateOKRStatus(selectedOKR.id, targetStatus);
-            onRefresh();
-            onClose();
-            onAlert("已驳回", isFromL2OrL3 ? "已退回，员工需要重新提交自评。" : "已退回至评分阶段。", "danger");
-        }, "danger");
+        const okrs = getOKRs();
+        const latestOKR = okrs.find(o => o.id === selectedOKR.id);
+        if (!latestOKR) {
+            onAlert("错误", "无法找到更新后的 OKR，请刷新页面后重试。", "danger");
+            return;
+        }
+        const updated = {
+            ...latestOKR,
+            ...selectedOKR,
+            adjustmentReason: reason,
+            version: latestOKR.version,
+        };
+        await saveImmediately(updated);
+        await updateOKRStatus(selectedOKR.id, targetStatus, { statusRejectReason: reason });
+        setAssessmentRejectOpen(false);
+        onRefresh();
+        onClose();
+        onAlert("已驳回", isFromL2OrL3 ? "已退回，员工需要重新提交自评。" : "已退回至评分阶段。", "danger");
     };
 
     const handleExecutiveVeto = () => {
@@ -419,7 +417,13 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
                 return;
             }
             // 使用最新的 OKR，但保留当前编辑的内容和状态，确保版本号不被覆盖
-            const updated = { ...latestOKR, ...selectedOKR, status: OKRStatus.PENDING_ASSESSMENT_APPROVAL, version: latestOKR.version };
+            const updated = {
+                ...latestOKR,
+                ...selectedOKR,
+                status: OKRStatus.PENDING_ASSESSMENT_APPROVAL,
+                statusRejectReason: selectedOKR.adjustmentReason?.trim() || undefined,
+                version: latestOKR.version,
+            };
             // 等待保存完成，确保数据已保存到服务器
             await saveOKR(updated);
             onRefresh();
@@ -540,6 +544,7 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
 
     // ... (Render Modal Content - Identical to original) ...
     return (
+        <>
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200">
                 <div className="p-6 border-b border-slate-100 flex justify-between items-start bg-slate-50 rounded-t-xl">
@@ -800,6 +805,14 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
                 </div>
             </div>
         </div>
+        <RejectReasonDialog
+            isOpen={assessmentRejectOpen}
+            title="驳回绩效审批"
+            description="请填写驳回理由，员工将在「我的 OKR」中查看。"
+            onClose={() => setAssessmentRejectOpen(false)}
+            onConfirm={confirmAssessmentReject}
+        />
+        </>
     );
 };
 
@@ -812,6 +825,8 @@ export const Assessment: React.FC = () => {
     const [roleOptions, setRoleOptions] = useState<{ value: string, label: string }[]>([]);
     const [selectedOKR, setSelectedOKR] = useState<OKR | null>(null);
     const [teamViewFilterDept, setTeamViewFilterDept] = useState<string | null>(null);
+    const [batchRejectItems, setBatchRejectItems] = useState<OKR[]>([]);
+    const [batchRejectOpen, setBatchRejectOpen] = useState(false);
 
     const [dialog, setDialog] = useState<{
         isOpen: boolean;
@@ -1127,39 +1142,36 @@ export const Assessment: React.FC = () => {
         }, "success");
     };
     const handleBatchRejectCrossLevel = (items: OKR[]) => {
-        openConfirm("确认批量驳回?", `即将把 ${items.length} 个评估退回给员工重新提交自评。`, async () => {
-            try {
-                console.log('[批量驳回] 开始批量驳回，数量:', items.length);
-                // 等待所有状态更新完成，确保数据已保存到服务器
-                await Promise.all(items.map(async (okr) => {
-                    try {
-                        // 根据当前状态决定退回到哪个状态
-                        // 如果是从 L2/L3 审批驳回，应该退回到 PUBLISHED（待提交自评）
-                        // 如果是从 PENDING_ASSESSMENT_APPROVAL 驳回，也应该退回到 PUBLISHED
-                        const targetStatus = (okr.status === OKRStatus.PENDING_L2_APPROVAL ||
-                            okr.status === OKRStatus.PENDING_L3_APPROVAL ||
-                            okr.status === OKRStatus.PENDING_ASSESSMENT_APPROVAL)
-                            ? OKRStatus.PUBLISHED
-                            : OKRStatus.PENDING_ASSESSMENT_APPROVAL;
+        if (items.length === 0) return;
+        setBatchRejectItems(items);
+        setBatchRejectOpen(true);
+    };
 
-                        console.log('[批量驳回] 驳回 OKR:', okr.id, '从状态:', okr.status, '到状态:', targetStatus);
-                        await updateOKRStatus(okr.id, targetStatus);
-                        console.log('[批量驳回] OKR 驳回成功:', okr.id);
-                    } catch (error) {
-                        console.error('[批量驳回] OKR 驳回失败:', okr.id, error);
-                        throw error;
-                    }
-                }));
-                console.log('[批量驳回] 所有 OKR 驳回完成，刷新数据');
-                // 等待一小段时间，确保服务器状态已更新
-                await new Promise(resolve => setTimeout(resolve, 100));
-                refreshData();
-                openAlert("批量操作成功", "已全部驳回，员工需要重新提交自评。", "success");
-            } catch (error) {
-                console.error('[批量驳回] 批量驳回失败:', error);
-                openAlert("错误", `批量驳回失败: ${error instanceof Error ? error.message : '未知错误'}，请重试。`, "danger");
-            }
-        }, "danger");
+    const confirmBatchRejectCrossLevel = async (reason: string) => {
+        const items = batchRejectItems;
+        if (items.length === 0) {
+            setBatchRejectOpen(false);
+            return;
+        }
+        try {
+            await Promise.all(items.map(async (okr) => {
+                const targetStatus =
+                    okr.status === OKRStatus.PENDING_L2_APPROVAL ||
+                    okr.status === OKRStatus.PENDING_L3_APPROVAL ||
+                    okr.status === OKRStatus.PENDING_ASSESSMENT_APPROVAL
+                        ? OKRStatus.PUBLISHED
+                        : OKRStatus.PENDING_ASSESSMENT_APPROVAL;
+                await updateOKRStatus(okr.id, targetStatus, { statusRejectReason: reason });
+            }));
+            await new Promise(resolve => setTimeout(resolve, 100));
+            setBatchRejectOpen(false);
+            setBatchRejectItems([]);
+            refreshData();
+            openAlert("批量操作成功", "已全部驳回，员工可在「我的 OKR」查看驳回理由并重新提交自评。", "success");
+        } catch (error) {
+            console.error('[批量驳回] 批量驳回失败:', error);
+            openAlert("错误", `批量驳回失败: ${error instanceof Error ? error.message : '未知错误'}，请重试。`, "danger");
+        }
     };
     const handleArchivePerformance = (deptName: string, deptOkrs: OKR[]) => {
         openConfirm("确认绩效归档", `确认将 ${deptName} 的 ${deptOkrs.length} 个绩效进行归档发布？`, async () => {
@@ -1259,6 +1271,16 @@ export const Assessment: React.FC = () => {
                 message={dialog.message}
                 type={dialog.type}
                 showCancel={dialog.showCancel}
+            />
+            <RejectReasonDialog
+                isOpen={batchRejectOpen}
+                title="批量驳回绩效"
+                description={batchRejectItems.length > 0 ? `即将把 ${batchRejectItems.length} 项评估退回，请填写统一驳回理由（员工将在「我的 OKR」中查看）。` : undefined}
+                onClose={() => {
+                    setBatchRejectOpen(false);
+                    setBatchRejectItems([]);
+                }}
+                onConfirm={confirmBatchRejectCrossLevel}
             />
 
             <div>

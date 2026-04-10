@@ -33,6 +33,21 @@ async function getWorkflowSnapshot(userRole: string): Promise<{
   };
 }
 
+/** 审批通过、进入下一阶段时清除「驳回理由」展示字段 */
+function shouldClearStatusRejectReason(from: OKRStatus, to: OKRStatus): boolean {
+  const clears: [OKRStatus, OKRStatus][] = [
+    [OKRStatus.PENDING_MANAGER, OKRStatus.PENDING_GM],
+    [OKRStatus.PENDING_MANAGER, OKRStatus.PUBLISHED],
+    [OKRStatus.PENDING_GM, OKRStatus.PUBLISHED],
+    [OKRStatus.PENDING_ASSESSMENT_APPROVAL, OKRStatus.PENDING_L2_APPROVAL],
+    [OKRStatus.PENDING_ASSESSMENT_APPROVAL, OKRStatus.PENDING_ARCHIVE],
+    [OKRStatus.PENDING_L2_APPROVAL, OKRStatus.PENDING_L3_APPROVAL],
+    [OKRStatus.PENDING_L2_APPROVAL, OKRStatus.PENDING_ARCHIVE],
+    [OKRStatus.PENDING_L3_APPROVAL, OKRStatus.PENDING_ARCHIVE],
+  ];
+  return clears.some(([f, t]) => f === from && t === to);
+}
+
 // 验证权重总和
 function validateWeights(okr: Partial<OKR>): { valid: boolean; reason?: string } {
   if (!okr.objectives || !Array.isArray(okr.objectives)) {
@@ -235,6 +250,15 @@ export const updateOKR = async (req: Request, res: Response) => {
       }
     }
     
+    if (okrData.status && okrData.status !== existing.status) {
+      if (existing.status === OKRStatus.DRAFT && okrData.status === OKRStatus.PENDING_MANAGER) {
+        okrData.statusRejectReason = null;
+      }
+      if (existing.status === OKRStatus.PUBLISHED && okrData.status === OKRStatus.PENDING_ASSESSMENT_APPROVAL) {
+        okrData.statusRejectReason = null;
+      }
+    }
+
     console.log(`[updateOKR] 开始执行数据库更新`);
     
     // 更新 OKR（包含版本控制）
@@ -313,7 +337,8 @@ export const updateOKRStatus = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const userId = req.userId!;
-    const { status, ...otherData } = req.body;
+    const { status, version, statusRejectReason: bodyRejectReason, ...otherData } = req.body;
+    const reasonTrim = typeof bodyRejectReason === 'string' ? bodyRejectReason.trim() : '';
     
     if (!status) {
       throw new AppError(ErrorCode.VALIDATION_ERROR, '状态不能为空', 400);
@@ -360,9 +385,44 @@ export const updateOKRStatus = async (req: Request, res: Response) => {
       }
     }
     
-    // 更新状态和其他数据
     const updateData: any = { status, ...otherData };
-    
+    delete updateData.statusRejectReason;
+
+    if (shouldClearStatusRejectReason(okr.status as OKRStatus, status as OKRStatus)) {
+      updateData.statusRejectReason = null;
+    } else {
+      const isCreationReject =
+        status === OKRStatus.DRAFT &&
+        (okr.status === OKRStatus.PENDING_MANAGER || okr.status === OKRStatus.PENDING_GM);
+
+      const isAssessmentReject =
+        (status === OKRStatus.PUBLISHED &&
+          [
+            OKRStatus.PENDING_L2_APPROVAL,
+            OKRStatus.PENDING_L3_APPROVAL,
+            OKRStatus.PENDING_ASSESSMENT_APPROVAL,
+          ].includes(okr.status as OKRStatus)) ||
+        (status === OKRStatus.PENDING_ASSESSMENT_APPROVAL &&
+          okr.status === OKRStatus.PENDING_ASSESSMENT_APPROVAL);
+
+      if (isCreationReject) {
+        if (isAdmin && !reasonTrim) {
+          updateData.statusRejectReason = null;
+        } else if (!reasonTrim) {
+          throw new AppError(ErrorCode.VALIDATION_ERROR, '请填写驳回理由', 400);
+        } else {
+          updateData.statusRejectReason = reasonTrim;
+        }
+      } else if (isAssessmentReject) {
+        if (!reasonTrim) {
+          throw new AppError(ErrorCode.VALIDATION_ERROR, '请填写驳回理由', 400);
+        }
+        updateData.statusRejectReason = reasonTrim;
+      } else if (isAdmin && isResetToDraft && !isCreationReject) {
+        updateData.statusRejectReason = reasonTrim || null;
+      }
+    }
+
     // 如果重置为草稿，强制清除绩效归档标记和评分，允许重新编辑
     if (isResetToDraft) {
       updateData.isPerformanceArchived = false;
@@ -370,7 +430,7 @@ export const updateOKRStatus = async (req: Request, res: Response) => {
       updateData.finalGrade = null;
     }
 
-    const updatedOKR = await OKRModel.update(id, updateData, userId, req.body.version);
+    const updatedOKR = await OKRModel.update(id, updateData, userId, version);
     
     // 记录日志
     const user = await UserModel.findById(userId);

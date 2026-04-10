@@ -7,6 +7,7 @@ import { OKR, OKRStatus, Role, ROLE_NAMES, User, FinalGrade, OKRLevel } from '..
 import { getOKRScopeTypeLabel } from '../utils/okrScope';
 import { Check, X, Workflow, ShieldAlert, Users, MessageSquare, FileText, ClipboardList, Send, Copy, MessageCircle, Clock, Calendar, Search } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { RejectReasonDialog } from '../components/RejectReasonDialog';
 
 export const Approvals: React.FC = () => {
     const user = useCurrentUser();
@@ -17,6 +18,7 @@ export const Approvals: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedOKR, setSelectedOKR] = useState<OKR | null>(null);
     const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+    const [rejectTarget, setRejectTarget] = useState<OKR | null>(null);
 
     // Dialog State
     const [dialog, setDialog] = useState<{
@@ -144,11 +146,18 @@ export const Approvals: React.FC = () => {
         setPending(pending.filter(p => p.id !== okr.id));
     };
 
-    const handleReject = async (okr: OKR) => {
-        // Creation reject, back to DRAFT.
-        // 等待状态更新完成，确保数据已保存到服务器
-        await updateOKRStatus(okr.id, OKRStatus.DRAFT);
+    const openRejectDialog = (okr: OKR) => {
+        setRejectTarget(okr);
+    };
+
+    const confirmRejectCreation = async (reason: string) => {
+        if (!rejectTarget) return;
+        const okr = rejectTarget;
+        await updateOKRStatus(okr.id, OKRStatus.DRAFT, { statusRejectReason: reason });
+        setRejectTarget(null);
         setPending(pending.filter(p => p.id !== okr.id));
+        setIsDetailsOpen(false);
+        setSelectedOKR(null);
     };
 
     const handleSubmitFeedback = async (okr: OKR, comment: string, grade?: string) => {
@@ -196,6 +205,13 @@ export const Approvals: React.FC = () => {
                 message={dialog.message}
                 type={dialog.type}
                 showCancel={dialog.showCancel}
+            />
+
+            <RejectReasonDialog
+                isOpen={!!rejectTarget}
+                title="驳回 OKR 定稿"
+                onClose={() => setRejectTarget(null)}
+                onConfirm={confirmRejectCreation}
             />
 
             <div className="flex justify-between items-center mb-6">
@@ -259,7 +275,7 @@ export const Approvals: React.FC = () => {
                                     type="CREATION"
                                     allUsers={allUsers}
                                     onApprove={() => handleApproveCreation(okr)}
-                                    onReject={() => handleReject(okr)}
+                                    onReject={() => openRejectDialog(okr)}
                                     onDetails={() => openDetails(okr)}
                                 />
                             ))}
@@ -296,8 +312,7 @@ export const Approvals: React.FC = () => {
                         setIsDetailsOpen(false);
                     }}
                     onReject={() => {
-                        handleReject(selectedOKR);
-                        setIsDetailsOpen(false);
+                        openRejectDialog(selectedOKR);
                     }}
                 />
             )}

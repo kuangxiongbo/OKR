@@ -1013,7 +1013,11 @@ export const createOKR = (user: User, level: OKRLevel): OKR => {
     };
 };
 
-export const updateOKRStatus = async (id: string, status: OKRStatus) => {
+export const updateOKRStatus = async (
+    id: string,
+    status: OKRStatus,
+    options?: { statusRejectReason?: string }
+) => {
     console.log('[updateOKRStatus] 开始更新状态:', id, '新状态:', status);
     
     // 从缓存中获取最新的 OKR（包含更新后的版本号）
@@ -1046,7 +1050,12 @@ export const updateOKRStatus = async (id: string, status: OKRStatus) => {
             const versionToSend = currentOKR.version ?? okr.version ?? 1;
             console.log(`[updateOKRStatus] 尝试 ${retryCount + 1}/${maxRetries}, 版本号: ${versionToSend}`);
             
-            const result = await okrsAPI.updateStatus(id, status, versionToSend);
+            const result = await okrsAPI.updateStatus(
+                id,
+                status,
+                versionToSend,
+                options?.statusRejectReason
+            );
             console.log('[updateOKRStatus] API 响应:', result);
             
             if (result.success && result.data?.okr) {

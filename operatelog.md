@@ -1,5 +1,13 @@
 # 操作日志
 
+## 2026-04-10
+
+- **私有仓库镜像**：已执行 `docker context use default` 后运行 `REGISTRY_PREFIX=192.168.210.90:6000/library ./deploy_x86.sh v2026.04.10.1`，推送 `192.168.210.90:6000/okr-backend` 与 `okr-frontend` 的标签 `v2026.04.10.1` 及 `latest`（脚本末尾 `imagetools inspect` 对 HTTP 私仓报 HTTPS 客户端错误可忽略）。
+- **审批驳回理由（端到端）**：定稿审批（`pages/Approvals.tsx`）、绩效单条驳回（`AssessmentModal` 内 `RejectReasonDialog`）与绩效**批量驳回**（`pages/Assessment.tsx` 主页面 `RejectReasonDialog`）均需填写驳回理由；通过 `updateOKRStatus(..., { statusRejectReason })` 提交；后端 `updateOKRStatus` 对定稿驳回与考核相关驳回校验必填理由，并在通过/进入下一阶段时按规则清空 `status_reject_reason`。
+- **数据与模型**：`types.ts` / `backend/src/types.ts` 增加 `statusRejectReason`；迁移 `status_reject_reason` 列；`OKR` 模型读写该字段。
+- **「我的 OKR」展示**：`pages/MyOKRs.tsx` 在状态徽章下方展示「驳回说明」与 `okr.statusRejectReason`（有内容时）。
+- **`pages/Assessment.tsx`**：`AssessmentModal` 根节点改为 Fragment 并挂载绩效单条驳回弹窗；批量驳回由确认框改为 `RejectReasonDialog`，对多项使用**统一理由**逐条调用 `updateOKRStatus`。
+
 ## 2026-04-07
 
 - **私有仓库镜像（二次发布）**：执行 `REGISTRY_PREFIX=192.168.210.90:6000/library ./deploy_x86.sh v2026.04.07.2`，推送 `192.168.210.90:6000/okr-backend` 与 `okr-frontend` 的标签 `v2026.04.07.2` 及 `latest`（含 AI 导入 Nginx 请求体上限与前端去重 `imageBase64` 等改动）。

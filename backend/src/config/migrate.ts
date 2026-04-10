@@ -138,6 +138,10 @@ export async function migrate() {
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_okrs_user_display_order ON okrs(user_id, display_order);
     `);
+
+    await client.query(`
+      ALTER TABLE okrs ADD COLUMN IF NOT EXISTS status_reject_reason TEXT;
+    `);
     
     // GIN 索引需要单独创建（如果不存在且列存在）
     try {
