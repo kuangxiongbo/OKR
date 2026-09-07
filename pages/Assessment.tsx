@@ -200,6 +200,7 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
     const canGradeDetails = (!user.role.includes(Role.ADMIN) && !selectedOKR.isPerformanceArchived && isL1Stage);
 
     const canAdjustGrade = (!user.role.includes(Role.ADMIN) && !selectedOKR.isPerformanceArchived && (isL1Stage || isCrossStage)) || isVetoStage;
+    const canSingleReject = !isSelf && !selectedOKR.isPerformanceArchived && (isL1Stage || isCrossStage);
 
     const isHRBP = user.role === Role.HRBP || user.role === Role.ADMIN;
     const canArchive = isHRBP && selectedOKR.status === OKRStatus.PENDING_ARCHIVE && !selectedOKR.isPerformanceArchived;
@@ -209,6 +210,7 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
     const hasCCFeedback = !!(selectedOKR.ccFeedback && selectedOKR.ccFeedback.length > 0);
     const targetUser = allUsers.find(u => u.id === selectedOKR.userId);
     const isTargetCadre = targetUser ? isCadre(targetUser.role) : false;
+    const managerTotalScore = selectedOKR.totalScore ?? selectedOKR.overallManagerAssessment?.score;
 
     // Determine Status Text in Modal
     let modalStatusText = '未知';
@@ -380,9 +382,8 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
     };
 
     const confirmAssessmentReject = async (reason: string) => {
-        const isFromL2OrL3 = selectedOKR.status === OKRStatus.PENDING_L2_APPROVAL ||
-            selectedOKR.status === OKRStatus.PENDING_L3_APPROVAL;
-        const targetStatus = isFromL2OrL3 ? OKRStatus.PUBLISHED : OKRStatus.PENDING_ASSESSMENT_APPROVAL;
+        // 无论一级评分还是跨级审批，驳回后都退回自评状态，员工可以修改并重新提交。
+        const targetStatus = OKRStatus.PUBLISHED;
         const okrs = getOKRs();
         const latestOKR = okrs.find(o => o.id === selectedOKR.id);
         if (!latestOKR) {
@@ -400,7 +401,7 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
         setAssessmentRejectOpen(false);
         onRefresh();
         onClose();
-        onAlert("已驳回", isFromL2OrL3 ? "已退回，员工需要重新提交自评。" : "已退回至评分阶段。", "danger");
+        onAlert("已驳回", "已退回，员工可以修改自评后重新提交。", "danger");
     };
 
     const handleExecutiveVeto = () => {
@@ -705,7 +706,11 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                                 <div className="lg:col-span-1 space-y-4">
                                     <div className="bg-white p-4 rounded-lg border border-orange-100 shadow-sm text-center h-full flex flex-col justify-center">
-                                        <div className="text-xs text-orange-500 uppercase font-bold mb-1">最终定级</div>
+                                        <div className="text-xs text-orange-500 uppercase font-bold mb-1">最终得分</div>
+                                        <div className="text-4xl font-extrabold text-orange-600">
+                                            {managerTotalScore ?? '-'}
+                                        </div>
+                                        <div className="text-xs text-orange-500 uppercase font-bold mt-4 mb-1">最终定级</div>
                                         {canAdjustGrade ? (
                                             <select className={`text-4xl font-extrabold text-center bg-transparent outline-none w-full ${selectedOKR.finalGrade === 'S' ? 'text-yellow-500' : selectedOKR.finalGrade === 'A' ? 'text-green-500' : 'text-blue-500'}`} value={selectedOKR.finalGrade || FinalGrade.PENDING} onChange={e => updateFinalGrade(e.target.value as FinalGrade)}>
                                                 <option value={FinalGrade.PENDING}>待定</option>
@@ -791,9 +796,11 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
                     <div className="flex gap-3">
                         <button onClick={onClose} className="px-4 py-2 text-slate-600 hover:bg-slate-200 rounded">关闭</button>
                         {isSelf && canEditSelf && <button onClick={submitSelfAssessmentClick} className="px-6 py-2 bg-brand-600 text-white rounded hover:bg-brand-700 flex items-center gap-2"><Send size={16} /> 提交自评</button>}
-                        {isCrossStage ? (
+                        {canSingleReject ? (
                             <>
-                                <button onClick={handleManagerConfirm} className="px-4 py-2 bg-slate-200 text-slate-700 rounded hover:bg-slate-300 font-medium">保存 (去列表批量批准)</button>
+                                <button onClick={handleManagerConfirm} className="px-4 py-2 bg-slate-200 text-slate-700 rounded hover:bg-slate-300 font-medium">
+                                    {isCrossStage ? "保存 (去列表批量批准)" : "保存评分"}
+                                </button>
                                 <button onClick={handleSingleReject} className="px-4 py-2 bg-white border border-red-200 text-red-600 rounded hover:bg-red-50 flex items-center gap-2 font-bold"><ThumbsDown size={16} /> 驳回</button>
                             </>
                         ) : (
@@ -1224,6 +1231,7 @@ export const Assessment: React.FC = () => {
                         const btnClass = isMyTurn
                             ? "bg-brand-600 text-white border-brand-600 hover:bg-brand-700 shadow-sm"
                             : "bg-white border-slate-200 text-slate-600 hover:bg-brand-50 hover:text-brand-600 hover:border-brand-200";
+                        const totalScore = okr.totalScore ?? okr.overallManagerAssessment?.score;
 
                         return (
                             <div key={okr.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors group">
@@ -1241,6 +1249,9 @@ export const Assessment: React.FC = () => {
                                 </div>
                                 <div className="flex items-center gap-3">
                                     <div className="text-right hidden md:block">
+                                        <div className="text-xs font-bold text-indigo-600">
+                                            得分: {totalScore ?? '-'}
+                                        </div>
                                         <div className="text-[10px] text-slate-400 uppercase">Status</div>
                                         <div className={`text-xs font-bold ${okr.status === OKRStatus.PUBLISHED ? 'text-slate-500' : okr.status === OKRStatus.PENDING_ARCHIVE ? 'text-cyan-600' : okr.isPerformanceArchived ? 'text-slate-800' : 'text-orange-600'}`}>
                                             {okr.status === OKRStatus.PENDING_ASSESSMENT_APPROVAL ? '待评分' : okr.status === OKRStatus.PENDING_L2_APPROVAL ? '待二级审批' : okr.status === OKRStatus.PENDING_L3_APPROVAL ? '待三级审批' : okr.status === OKRStatus.PENDING_ARCHIVE ? '待归档' : okr.isPerformanceArchived ? '已归档' : '草稿/自评中'}
