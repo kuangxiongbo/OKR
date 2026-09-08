@@ -1506,6 +1506,7 @@ export const Assessment: React.FC = () => {
                                 const stats = aggregateMemberStats(gradedDeptOKRs);
                                 const overLimit = stats.find(s => s.isOver);
                                 const deptReviewOKRs = deptOKRs.filter(o => o.status === OKRStatus.PENDING_L2_APPROVAL || o.status === OKRStatus.PENDING_L3_APPROVAL);
+                                const canApproveDept = isFullySubmitted && deptReviewOKRs.length > 0;
 
                                 return (
                                     <div key={dept} onClick={() => { if (isSubmitted) { setTeamViewFilterDept(dept); setActiveTab('TEAM_MEMBERS'); } }} className={`relative overflow-hidden rounded-xl border p-5 transition-all ${isSubmitted ? 'bg-white border-slate-200 shadow-sm hover:shadow-md hover:border-brand-300 cursor-pointer group' : 'bg-slate-50 border-slate-200 opacity-70 cursor-not-allowed'}`}>
@@ -1529,6 +1530,16 @@ export const Assessment: React.FC = () => {
                                         {overLimit && isSubmitted && <div className="flex items-center gap-1 text-xs text-red-600 bg-red-50 px-2 py-1.5 rounded mb-2"><AlertTriangle size={12} /><span>{overLimit.grade} 级比例超标</span></div>}
                                         {isSubmitted ? (
                                             <div className="flex items-center justify-between gap-3 mt-2">
+                                                <button
+                                                    onClick={(event) => {
+                                                        event.stopPropagation();
+                                                        handleUnifiedBatchApprove(deptReviewOKRs);
+                                                    }}
+                                                    disabled={!canApproveDept}
+                                                    className="text-xs font-bold text-brand-600 border border-brand-200 px-2.5 py-1.5 rounded hover:bg-brand-50 disabled:text-slate-400 disabled:border-slate-200 disabled:bg-slate-50 disabled:cursor-not-allowed"
+                                                >
+                                                    同意该部门
+                                                </button>
                                                 <button
                                                     onClick={(event) => {
                                                         event.stopPropagation();
