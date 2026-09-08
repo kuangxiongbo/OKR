@@ -41,6 +41,8 @@ export const STATUS_TRANSITIONS: Record<OKRStatus, OKRStatus[]> = {
   ],
   [OKRStatus.PENDING_ARCHIVE]: [
     OKRStatus.CLOSED,
+    OKRStatus.PENDING_L3_APPROVAL, // 终审驳回，退回三级审批
+    OKRStatus.PENDING_L2_APPROVAL, // 终审驳回，退回二级审批
     OKRStatus.PENDING_ASSESSMENT_APPROVAL, // 允许一票否决，退回至评分阶段
     OKRStatus.DRAFT // 允许管理员重置为草稿
   ],

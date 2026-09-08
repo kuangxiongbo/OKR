@@ -1176,8 +1176,11 @@ export const Assessment: React.FC = () => {
         }
         try {
             await Promise.all(items.map(async (okr) => {
+                const { l2, l3 } = getApproverRoles(okr);
                 const targetStatus = batchRejectTargetStatus || (
-                    okr.status === OKRStatus.PENDING_L3_APPROVAL
+                    okr.status === OKRStatus.PENDING_ARCHIVE
+                        ? (l3 ? OKRStatus.PENDING_L3_APPROVAL : l2 ? OKRStatus.PENDING_L2_APPROVAL : OKRStatus.PENDING_ASSESSMENT_APPROVAL)
+                        : okr.status === OKRStatus.PENDING_L3_APPROVAL
                         ? OKRStatus.PENDING_L2_APPROVAL
                         : okr.status === OKRStatus.PENDING_L2_APPROVAL
                             ? OKRStatus.PENDING_ASSESSMENT_APPROVAL
@@ -1194,7 +1197,8 @@ export const Assessment: React.FC = () => {
                 "批量操作成功",
                 batchRejectItems.some(o =>
                     o.status === OKRStatus.PENDING_L2_APPROVAL ||
-                    o.status === OKRStatus.PENDING_L3_APPROVAL
+                    o.status === OKRStatus.PENDING_L3_APPROVAL ||
+                    o.status === OKRStatus.PENDING_ARCHIVE
                 )
                     ? "已按各自审批层级退回上一级重新审核。"
                     : "已全部驳回，员工可在「我的 OKR」查看驳回理由并重新提交自评。",
@@ -1317,7 +1321,8 @@ export const Assessment: React.FC = () => {
                 description={batchRejectItems.length > 0
                     ? batchRejectItems.some(o =>
                         o.status === OKRStatus.PENDING_L2_APPROVAL ||
-                        o.status === OKRStatus.PENDING_L3_APPROVAL
+                        o.status === OKRStatus.PENDING_L3_APPROVAL ||
+                        o.status === OKRStatus.PENDING_ARCHIVE
                     )
                         ? `即将把 ${batchRejectItems.length} 项评估按当前审批层级分别退回上一级，请填写统一驳回理由。`
                         : `即将把 ${batchRejectItems.length} 项评估退回，请填写统一驳回理由（员工将在「我的 OKR」中查看）。`
@@ -1506,7 +1511,10 @@ export const Assessment: React.FC = () => {
                                 const stats = aggregateMemberStats(gradedDeptOKRs);
                                 const overLimit = stats.find(s => s.isOver);
                                 const deptReviewOKRs = deptOKRs.filter(o => o.status === OKRStatus.PENDING_L2_APPROVAL || o.status === OKRStatus.PENDING_L3_APPROVAL);
-                                const canApproveDept = isFullySubmitted && deptReviewOKRs.length > 0;
+                                const deptFinalReviewOKRs = deptOKRs.filter(o => o.status === OKRStatus.PENDING_ARCHIVE && !o.isPerformanceArchived);
+                                const deptActionOKRs = deptFinalReviewOKRs.length > 0 ? deptFinalReviewOKRs : deptReviewOKRs;
+                                const isFinalReviewDept = deptFinalReviewOKRs.length > 0;
+                                const canApproveDept = isFullySubmitted && deptActionOKRs.length > 0;
 
                                 return (
                                     <div key={dept} onClick={() => { if (isSubmitted) { setTeamViewFilterDept(dept); setActiveTab('TEAM_MEMBERS'); } }} className={`relative overflow-hidden rounded-xl border p-5 transition-all ${isSubmitted ? 'bg-white border-slate-200 shadow-sm hover:shadow-md hover:border-brand-300 cursor-pointer group' : 'bg-slate-50 border-slate-200 opacity-70 cursor-not-allowed'}`}>
@@ -1533,19 +1541,23 @@ export const Assessment: React.FC = () => {
                                                 <button
                                                     onClick={(event) => {
                                                         event.stopPropagation();
-                                                        handleUnifiedBatchApprove(deptReviewOKRs);
+                                                        if (isFinalReviewDept) {
+                                                            handleArchivePerformance(dept, deptActionOKRs);
+                                                        } else {
+                                                            handleUnifiedBatchApprove(deptActionOKRs);
+                                                        }
                                                     }}
                                                     disabled={!canApproveDept}
                                                     className="text-xs font-bold text-brand-600 border border-brand-200 px-2.5 py-1.5 rounded hover:bg-brand-50 disabled:text-slate-400 disabled:border-slate-200 disabled:bg-slate-50 disabled:cursor-not-allowed"
                                                 >
-                                                    同意该部门
+                                                    {isFinalReviewDept ? '终审通过' : '同意该部门'}
                                                 </button>
                                                 <button
                                                     onClick={(event) => {
                                                         event.stopPropagation();
-                                                        handleBatchRejectCrossLevel(deptReviewOKRs);
+                                                        handleBatchRejectCrossLevel(deptActionOKRs);
                                                     }}
-                                                    disabled={deptReviewOKRs.length === 0}
+                                                    disabled={deptActionOKRs.length === 0}
                                                     className="text-xs font-bold text-red-600 border border-red-200 px-2.5 py-1.5 rounded hover:bg-red-50 disabled:text-slate-400 disabled:border-slate-200 disabled:bg-slate-50 disabled:cursor-not-allowed"
                                                 >
                                                     驳回该部门

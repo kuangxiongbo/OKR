@@ -403,12 +403,18 @@ export const updateOKRStatus = async (req: Request, res: Response) => {
             OKRStatus.PENDING_L3_APPROVAL,
             OKRStatus.PENDING_ASSESSMENT_APPROVAL,
           ].includes(okr.status as OKRStatus)) ||
+        (status === OKRStatus.PENDING_L3_APPROVAL &&
+          okr.status === OKRStatus.PENDING_ARCHIVE) ||
         (status === OKRStatus.PENDING_L2_APPROVAL &&
-          okr.status === OKRStatus.PENDING_L3_APPROVAL) ||
+          [
+            OKRStatus.PENDING_L3_APPROVAL,
+            OKRStatus.PENDING_ARCHIVE,
+          ].includes(okr.status as OKRStatus)) ||
         (status === OKRStatus.PENDING_ASSESSMENT_APPROVAL &&
           [
             OKRStatus.PENDING_L2_APPROVAL,
             OKRStatus.PENDING_L3_APPROVAL,
+            OKRStatus.PENDING_ARCHIVE,
             OKRStatus.PENDING_ASSESSMENT_APPROVAL,
           ].includes(okr.status as OKRStatus));
 
