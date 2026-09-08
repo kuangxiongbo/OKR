@@ -383,10 +383,11 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
 
     const confirmAssessmentReject = async (reason: string) => {
         const targetStatus =
-            selectedOKR.status === OKRStatus.PENDING_L2_APPROVAL ||
             selectedOKR.status === OKRStatus.PENDING_L3_APPROVAL
-                ? OKRStatus.PENDING_ASSESSMENT_APPROVAL
-                : OKRStatus.PUBLISHED;
+                ? OKRStatus.PENDING_L2_APPROVAL
+                : selectedOKR.status === OKRStatus.PENDING_L2_APPROVAL
+                    ? OKRStatus.PENDING_ASSESSMENT_APPROVAL
+                    : OKRStatus.PUBLISHED;
         const okrs = getOKRs();
         const latestOKR = okrs.find(o => o.id === selectedOKR.id);
         if (!latestOKR) {
@@ -406,8 +407,10 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
         onClose();
         onAlert(
             "已驳回",
-            targetStatus === OKRStatus.PENDING_ASSESSMENT_APPROVAL
-                ? "已退回一级审批者重新评估。"
+            targetStatus === OKRStatus.PENDING_L2_APPROVAL
+                ? "已退回二级审批者重新审核。"
+                : targetStatus === OKRStatus.PENDING_ASSESSMENT_APPROVAL
+                    ? "已退回一级审批者重新评估。"
                 : "已退回，员工可以修改自评后重新提交。",
             "danger"
         );
@@ -1174,9 +1177,10 @@ export const Assessment: React.FC = () => {
         try {
             await Promise.all(items.map(async (okr) => {
                 const targetStatus = batchRejectTargetStatus || (
-                    okr.status === OKRStatus.PENDING_L2_APPROVAL ||
                     okr.status === OKRStatus.PENDING_L3_APPROVAL
-                        ? OKRStatus.PENDING_ASSESSMENT_APPROVAL
+                        ? OKRStatus.PENDING_L2_APPROVAL
+                        : okr.status === OKRStatus.PENDING_L2_APPROVAL
+                            ? OKRStatus.PENDING_ASSESSMENT_APPROVAL
                         : OKRStatus.PUBLISHED
                 );
                 await updateOKRStatus(okr.id, targetStatus, { statusRejectReason: reason });
@@ -1188,8 +1192,11 @@ export const Assessment: React.FC = () => {
             refreshData();
             openAlert(
                 "批量操作成功",
-                batchRejectTargetStatus === OKRStatus.PENDING_ASSESSMENT_APPROVAL
-                    ? "已退回一级审批者重新评估。"
+                batchRejectItems.some(o =>
+                    o.status === OKRStatus.PENDING_L2_APPROVAL ||
+                    o.status === OKRStatus.PENDING_L3_APPROVAL
+                )
+                    ? "已按各自审批层级退回上一级重新审核。"
                     : "已全部驳回，员工可在「我的 OKR」查看驳回理由并重新提交自评。",
                 "success"
             );
@@ -1303,10 +1310,16 @@ export const Assessment: React.FC = () => {
             />
             <RejectReasonDialog
                 isOpen={batchRejectOpen}
-                title={batchRejectTargetStatus === OKRStatus.PENDING_ASSESSMENT_APPROVAL ? "驳回部门绩效" : "批量驳回绩效"}
+                title={batchRejectItems.some(o =>
+                    o.status === OKRStatus.PENDING_L2_APPROVAL ||
+                    o.status === OKRStatus.PENDING_L3_APPROVAL
+                ) ? "驳回绩效并退回上一级" : "批量驳回绩效"}
                 description={batchRejectItems.length > 0
-                    ? batchRejectTargetStatus === OKRStatus.PENDING_ASSESSMENT_APPROVAL
-                        ? `即将把该部门 ${batchRejectItems.length} 项评估退回一级审批者，请填写统一驳回理由。`
+                    ? batchRejectItems.some(o =>
+                        o.status === OKRStatus.PENDING_L2_APPROVAL ||
+                        o.status === OKRStatus.PENDING_L3_APPROVAL
+                    )
+                        ? `即将把 ${batchRejectItems.length} 项评估按当前审批层级分别退回上一级，请填写统一驳回理由。`
                         : `即将把 ${batchRejectItems.length} 项评估退回，请填写统一驳回理由（员工将在「我的 OKR」中查看）。`
                     : undefined}
                 onClose={() => {
@@ -1511,7 +1524,7 @@ export const Assessment: React.FC = () => {
                                                 <button
                                                     onClick={(event) => {
                                                         event.stopPropagation();
-                                                        handleBatchRejectCrossLevel(deptReviewOKRs, OKRStatus.PENDING_ASSESSMENT_APPROVAL);
+                                                        handleBatchRejectCrossLevel(deptReviewOKRs);
                                                     }}
                                                     disabled={deptReviewOKRs.length === 0}
                                                     className="text-xs font-bold text-red-600 border border-red-200 px-2.5 py-1.5 rounded hover:bg-red-50 disabled:text-slate-400 disabled:border-slate-200 disabled:bg-slate-50 disabled:cursor-not-allowed"
