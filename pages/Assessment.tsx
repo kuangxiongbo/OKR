@@ -1500,15 +1500,23 @@ export const Assessment: React.FC = () => {
                                 const deptOKRs = memberOKRs.filter(o => o.department === dept);
                                 const submittedCount = deptOKRs.filter(o => o.status === OKRStatus.PENDING_L2_APPROVAL || o.status === OKRStatus.PENDING_L3_APPROVAL || o.status === OKRStatus.PENDING_ARCHIVE || o.status === OKRStatus.CLOSED || o.isPerformanceArchived).length;
                                 const isSubmitted = submittedCount > 0;
-                                const stats = aggregateMemberStats(deptOKRs.filter(o => o.status === OKRStatus.PENDING_L2_APPROVAL || o.status === OKRStatus.PENDING_L3_APPROVAL || o.status === OKRStatus.PENDING_ARCHIVE || o.status === OKRStatus.CLOSED || o.isPerformanceArchived));
+                                const gradedDeptOKRs = deptOKRs.filter(o => o.finalGrade && o.finalGrade !== FinalGrade.PENDING);
+                                const gradedCount = gradedDeptOKRs.length;
+                                const isFullySubmitted = deptOKRs.length > 0 && submittedCount >= deptOKRs.length;
+                                const stats = aggregateMemberStats(gradedDeptOKRs);
                                 const overLimit = stats.find(s => s.isOver);
                                 const deptReviewOKRs = deptOKRs.filter(o => o.status === OKRStatus.PENDING_L2_APPROVAL || o.status === OKRStatus.PENDING_L3_APPROVAL);
 
                                 return (
                                     <div key={dept} onClick={() => { if (isSubmitted) { setTeamViewFilterDept(dept); setActiveTab('TEAM_MEMBERS'); } }} className={`relative overflow-hidden rounded-xl border p-5 transition-all ${isSubmitted ? 'bg-white border-slate-200 shadow-sm hover:shadow-md hover:border-brand-300 cursor-pointer group' : 'bg-slate-50 border-slate-200 opacity-70 cursor-not-allowed'}`}>
                                         <div className="flex justify-between items-start mb-4">
-                                            <div><h4 className={`font-bold text-lg ${isSubmitted ? 'text-slate-800 group-hover:text-brand-600' : 'text-slate-500'}`}>{dept}</h4><p className="text-xs text-slate-500 mt-1">成员: {deptUsersCount} 人</p></div>
-                                            <span className={`px-2 py-1 rounded text-xs font-bold border ${isSubmitted ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>{isSubmitted ? '已提交 (待终审)' : '未提交'}</span>
+                                            <div>
+                                                <h4 className={`font-bold text-lg ${isSubmitted ? 'text-slate-800 group-hover:text-brand-600' : 'text-slate-500'}`}>{dept}</h4>
+                                                <p className="text-xs text-slate-500 mt-1">成员: {deptUsersCount} 人 · 已定级: {gradedCount}/{deptUsersCount}</p>
+                                            </div>
+                                            <span className={`px-2 py-1 rounded text-xs font-bold border ${isSubmitted ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                                                {isSubmitted ? (isFullySubmitted ? '已提交 (待终审)' : `部分提交 (${submittedCount}/${deptUsersCount})`) : '未提交'}
+                                            </span>
                                         </div>
                                         {isSubmitted ? (
                                             <>
