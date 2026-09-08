@@ -403,7 +403,11 @@ export const updateOKRStatus = async (req: Request, res: Response) => {
             OKRStatus.PENDING_ASSESSMENT_APPROVAL,
           ].includes(okr.status as OKRStatus)) ||
         (status === OKRStatus.PENDING_ASSESSMENT_APPROVAL &&
-          okr.status === OKRStatus.PENDING_ASSESSMENT_APPROVAL);
+          [
+            OKRStatus.PENDING_L2_APPROVAL,
+            OKRStatus.PENDING_L3_APPROVAL,
+            OKRStatus.PENDING_ASSESSMENT_APPROVAL,
+          ].includes(okr.status as OKRStatus));
 
       if (isCreationReject) {
         if (isAdmin && !reasonTrim) {

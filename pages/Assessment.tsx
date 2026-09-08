@@ -382,8 +382,11 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
     };
 
     const confirmAssessmentReject = async (reason: string) => {
-        // 无论一级评分还是跨级审批，驳回后都退回自评状态，员工可以修改并重新提交。
-        const targetStatus = OKRStatus.PUBLISHED;
+        const targetStatus =
+            selectedOKR.status === OKRStatus.PENDING_L2_APPROVAL ||
+            selectedOKR.status === OKRStatus.PENDING_L3_APPROVAL
+                ? OKRStatus.PENDING_ASSESSMENT_APPROVAL
+                : OKRStatus.PUBLISHED;
         const okrs = getOKRs();
         const latestOKR = okrs.find(o => o.id === selectedOKR.id);
         if (!latestOKR) {
@@ -401,7 +404,13 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
         setAssessmentRejectOpen(false);
         onRefresh();
         onClose();
-        onAlert("已驳回", "已退回，员工可以修改自评后重新提交。", "danger");
+        onAlert(
+            "已驳回",
+            targetStatus === OKRStatus.PENDING_ASSESSMENT_APPROVAL
+                ? "已退回一级审批者重新评估。"
+                : "已退回，员工可以修改自评后重新提交。",
+            "danger"
+        );
     };
 
     const handleExecutiveVeto = () => {
@@ -834,6 +843,7 @@ export const Assessment: React.FC = () => {
     const [teamViewFilterDept, setTeamViewFilterDept] = useState<string | null>(null);
     const [batchRejectItems, setBatchRejectItems] = useState<OKR[]>([]);
     const [batchRejectOpen, setBatchRejectOpen] = useState(false);
+    const [batchRejectTargetStatus, setBatchRejectTargetStatus] = useState<OKRStatus | null>(null);
 
     const [dialog, setDialog] = useState<{
         isOpen: boolean;
@@ -1148,9 +1158,10 @@ export const Assessment: React.FC = () => {
             openAlert("批量操作成功", "已完成批准。", "success");
         }, "success");
     };
-    const handleBatchRejectCrossLevel = (items: OKR[]) => {
+    const handleBatchRejectCrossLevel = (items: OKR[], targetStatus?: OKRStatus) => {
         if (items.length === 0) return;
         setBatchRejectItems(items);
+        setBatchRejectTargetStatus(targetStatus ?? null);
         setBatchRejectOpen(true);
     };
 
@@ -1162,19 +1173,26 @@ export const Assessment: React.FC = () => {
         }
         try {
             await Promise.all(items.map(async (okr) => {
-                const targetStatus =
+                const targetStatus = batchRejectTargetStatus || (
                     okr.status === OKRStatus.PENDING_L2_APPROVAL ||
-                    okr.status === OKRStatus.PENDING_L3_APPROVAL ||
-                    okr.status === OKRStatus.PENDING_ASSESSMENT_APPROVAL
-                        ? OKRStatus.PUBLISHED
-                        : OKRStatus.PENDING_ASSESSMENT_APPROVAL;
+                    okr.status === OKRStatus.PENDING_L3_APPROVAL
+                        ? OKRStatus.PENDING_ASSESSMENT_APPROVAL
+                        : OKRStatus.PUBLISHED
+                );
                 await updateOKRStatus(okr.id, targetStatus, { statusRejectReason: reason });
             }));
             await new Promise(resolve => setTimeout(resolve, 100));
             setBatchRejectOpen(false);
             setBatchRejectItems([]);
+            setBatchRejectTargetStatus(null);
             refreshData();
-            openAlert("批量操作成功", "已全部驳回，员工可在「我的 OKR」查看驳回理由并重新提交自评。", "success");
+            openAlert(
+                "批量操作成功",
+                batchRejectTargetStatus === OKRStatus.PENDING_ASSESSMENT_APPROVAL
+                    ? "已退回一级审批者重新评估。"
+                    : "已全部驳回，员工可在「我的 OKR」查看驳回理由并重新提交自评。",
+                "success"
+            );
         } catch (error) {
             console.error('[批量驳回] 批量驳回失败:', error);
             openAlert("错误", `批量驳回失败: ${error instanceof Error ? error.message : '未知错误'}，请重试。`, "danger");
@@ -1285,11 +1303,16 @@ export const Assessment: React.FC = () => {
             />
             <RejectReasonDialog
                 isOpen={batchRejectOpen}
-                title="批量驳回绩效"
-                description={batchRejectItems.length > 0 ? `即将把 ${batchRejectItems.length} 项评估退回，请填写统一驳回理由（员工将在「我的 OKR」中查看）。` : undefined}
+                title={batchRejectTargetStatus === OKRStatus.PENDING_ASSESSMENT_APPROVAL ? "驳回部门绩效" : "批量驳回绩效"}
+                description={batchRejectItems.length > 0
+                    ? batchRejectTargetStatus === OKRStatus.PENDING_ASSESSMENT_APPROVAL
+                        ? `即将把该部门 ${batchRejectItems.length} 项评估退回一级审批者，请填写统一驳回理由。`
+                        : `即将把 ${batchRejectItems.length} 项评估退回，请填写统一驳回理由（员工将在「我的 OKR」中查看）。`
+                    : undefined}
                 onClose={() => {
                     setBatchRejectOpen(false);
                     setBatchRejectItems([]);
+                    setBatchRejectTargetStatus(null);
                 }}
                 onConfirm={confirmBatchRejectCrossLevel}
             />
@@ -1466,6 +1489,7 @@ export const Assessment: React.FC = () => {
                                 const isSubmitted = submittedCount > 0;
                                 const stats = aggregateMemberStats(deptOKRs.filter(o => o.status === OKRStatus.PENDING_L2_APPROVAL || o.status === OKRStatus.PENDING_L3_APPROVAL || o.status === OKRStatus.PENDING_ARCHIVE || o.status === OKRStatus.CLOSED || o.isPerformanceArchived));
                                 const overLimit = stats.find(s => s.isOver);
+                                const deptReviewOKRs = deptOKRs.filter(o => o.status === OKRStatus.PENDING_L2_APPROVAL || o.status === OKRStatus.PENDING_L3_APPROVAL);
 
                                 return (
                                     <div key={dept} onClick={() => { if (isSubmitted) { setTeamViewFilterDept(dept); setActiveTab('TEAM_MEMBERS'); } }} className={`relative overflow-hidden rounded-xl border p-5 transition-all ${isSubmitted ? 'bg-white border-slate-200 shadow-sm hover:shadow-md hover:border-brand-300 cursor-pointer group' : 'bg-slate-50 border-slate-200 opacity-70 cursor-not-allowed'}`}>
@@ -1482,7 +1506,21 @@ export const Assessment: React.FC = () => {
                                             <div className="h-16 flex items-center justify-center text-xs text-slate-400 border border-dashed border-slate-200 rounded mb-4 bg-slate-50/50"><div className="flex items-center gap-1"><Lock size={12} /> 等待一级主管提交</div></div>
                                         )}
                                         {overLimit && isSubmitted && <div className="flex items-center gap-1 text-xs text-red-600 bg-red-50 px-2 py-1.5 rounded mb-2"><AlertTriangle size={12} /><span>{overLimit.grade} 级比例超标</span></div>}
-                                        {isSubmitted ? <div className="text-xs font-bold text-brand-600 flex items-center justify-end gap-1 mt-2">查看详情 <ArrowRight size={12} /></div> : <div className="text-xs text-slate-400 flex items-center justify-end gap-1 mt-2"><Lock size={12} /> 暂无权限查看</div>}
+                                        {isSubmitted ? (
+                                            <div className="flex items-center justify-between gap-3 mt-2">
+                                                <button
+                                                    onClick={(event) => {
+                                                        event.stopPropagation();
+                                                        handleBatchRejectCrossLevel(deptReviewOKRs, OKRStatus.PENDING_ASSESSMENT_APPROVAL);
+                                                    }}
+                                                    disabled={deptReviewOKRs.length === 0}
+                                                    className="text-xs font-bold text-red-600 border border-red-200 px-2.5 py-1.5 rounded hover:bg-red-50 disabled:text-slate-400 disabled:border-slate-200 disabled:bg-slate-50 disabled:cursor-not-allowed"
+                                                >
+                                                    驳回该部门
+                                                </button>
+                                                <div className="text-xs font-bold text-brand-600 flex items-center gap-1">查看详情 <ArrowRight size={12} /></div>
+                                            </div>
+                                        ) : <div className="text-xs text-slate-400 flex items-center justify-end gap-1 mt-2"><Lock size={12} /> 暂无权限查看</div>}
                                     </div>
                                 );
                             })}

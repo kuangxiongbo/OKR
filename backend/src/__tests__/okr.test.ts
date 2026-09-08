@@ -268,6 +268,58 @@ describe('OKR API 测试', () => {
       expect(response.body.success).toBe(false);
       expect(response.body.error.code).toBe('INVALID_STATUS_TRANSITION');
     });
+
+    test('自评提交后可以带理由单人驳回并退回 PUBLISHED', async () => {
+      const okr = await OKRModel.create({
+        userId: testUserId,
+        level: OKRLevel.PERSONAL,
+        title: '单人驳回测试 OKR',
+        status: OKRStatus.PENDING_ASSESSMENT_APPROVAL,
+        overallSelfAssessment: { score: 80, comment: '自评总结' },
+        objectives: [{ id: 'obj-1', content: '测试', weight: 100, keyResults: [] }]
+      }, testUserId);
+
+      const response = await request(app)
+        .patch(`/api/v1/okrs/${okr.id}/status`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          status: OKRStatus.PUBLISHED,
+          statusRejectReason: '请补充自评完成情况',
+          version: okr.version
+        })
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.okr.status).toBe(OKRStatus.PUBLISHED);
+      expect(response.body.data.okr.statusRejectReason).toBe('请补充自评完成情况');
+
+      await OKRModel.delete(okr.id);
+    });
+
+    test('自评提交后单人驳回必须填写理由', async () => {
+      const okr = await OKRModel.create({
+        userId: testUserId,
+        level: OKRLevel.PERSONAL,
+        title: '单人驳回理由测试 OKR',
+        status: OKRStatus.PENDING_ASSESSMENT_APPROVAL,
+        overallSelfAssessment: { score: 80, comment: '自评总结' },
+        objectives: [{ id: 'obj-1', content: '测试', weight: 100, keyResults: [] }]
+      }, testUserId);
+
+      const response = await request(app)
+        .patch(`/api/v1/okrs/${okr.id}/status`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          status: OKRStatus.PUBLISHED,
+          version: okr.version
+        })
+        .expect(400);
+
+      expect(response.body.success).toBe(false);
+      expect(response.body.error.message).toContain('驳回理由');
+
+      await OKRModel.delete(okr.id);
+    });
   });
 
   describe('POST /api/v1/okrs/:id/approve - 审批 OKR', () => {

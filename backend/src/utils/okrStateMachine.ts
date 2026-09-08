@@ -29,11 +29,13 @@ export const STATUS_TRANSITIONS: Record<OKRStatus, OKRStatus[]> = {
   [OKRStatus.PENDING_L2_APPROVAL]: [
     OKRStatus.PENDING_L3_APPROVAL,
     OKRStatus.PENDING_ARCHIVE,
+    OKRStatus.PENDING_ASSESSMENT_APPROVAL, // 二级驳回，退回一级评分
     OKRStatus.PUBLISHED, // 允许驳回，退回到待提交自评状态
     OKRStatus.DRAFT // 允许管理员重置为草稿
   ],
   [OKRStatus.PENDING_L3_APPROVAL]: [
     OKRStatus.PENDING_ARCHIVE,
+    OKRStatus.PENDING_ASSESSMENT_APPROVAL, // 三级驳回，退回一级评分
     OKRStatus.PUBLISHED, // 允许驳回，退回到待提交自评状态
     OKRStatus.DRAFT // 允许管理员重置为草稿
   ],
