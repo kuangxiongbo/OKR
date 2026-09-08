@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { randomUUID } from 'crypto';
 import { OKRModel } from '../models/OKR';
 import { UserModel } from '../models/User';
 import { AppError, ErrorCode, createSuccessResponse, createErrorResponse } from '../utils/errors';
@@ -438,18 +439,23 @@ export const updateOKRStatus = async (req: Request, res: Response) => {
 
     const updatedOKR = await OKRModel.update(id, updateData, userId, version);
     
-    // 记录日志
-    const user = await UserModel.findById(userId);
-    await OperationLogModel.create({
-      id: `log-${Date.now()}`,
-      userId,
-      userName: user?.name || 'Unknown',
-      action: 'UPDATE_OKR_STATUS',
-      module: 'OKR',
-      details: `更新 OKR 状态: ${okr.status} -> ${status}`,
-      ip: req.ip || '',
-      timestamp: new Date().toISOString()
-    });
+    // 记录日志。批量操作会并发请求，不能只使用毫秒时间戳作为主键。
+    try {
+      const user = await UserModel.findById(userId);
+      await OperationLogModel.create({
+        id: `log-${randomUUID()}`,
+        userId,
+        userName: user?.name || 'Unknown',
+        action: 'UPDATE_OKR_STATUS',
+        module: 'OKR',
+        details: `更新 OKR 状态: ${okr.status} -> ${status}`,
+        ip: req.ip || '',
+        timestamp: new Date().toISOString()
+      });
+    } catch (logError) {
+      // 状态已成功更新，日志失败不能让前端误报本次业务操作失败。
+      console.error('Update OKR status log error:', logError);
+    }
     
     res.json(createSuccessResponse({ okr: updatedOKR }));
   } catch (error: any) {
