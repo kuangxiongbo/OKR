@@ -879,7 +879,7 @@ export const Assessment: React.FC = () => {
         setSelectedOKR(null);
         window.addEventListener('alignflow_data_updated', refreshData);
         return () => window.removeEventListener('alignflow_data_updated', refreshData);
-    }, [user]);
+    }, [user?.id]);
 
     // DYNAMIC PERMISSIONS: Driven by Workflow Configuration
 
