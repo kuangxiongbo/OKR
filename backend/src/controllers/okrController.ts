@@ -392,6 +392,12 @@ export const updateOKRStatus = async (req: Request, res: Response) => {
     if (shouldClearStatusRejectReason(okr.status as OKRStatus, status as OKRStatus)) {
       updateData.statusRejectReason = null;
     } else {
+      const isAdminCancelFinalReview =
+        isAdmin &&
+        okr.status === OKRStatus.PENDING_ARCHIVE &&
+        (status === OKRStatus.PENDING_L3_APPROVAL || status === OKRStatus.PENDING_L2_APPROVAL) &&
+        !reasonTrim;
+
       const isCreationReject =
         status === OKRStatus.DRAFT &&
         (okr.status === OKRStatus.PENDING_MANAGER || okr.status === OKRStatus.PENDING_GM);
@@ -418,7 +424,9 @@ export const updateOKRStatus = async (req: Request, res: Response) => {
             OKRStatus.PENDING_ASSESSMENT_APPROVAL,
           ].includes(okr.status as OKRStatus));
 
-      if (isCreationReject) {
+      if (isAdminCancelFinalReview) {
+        updateData.statusRejectReason = null;
+      } else if (isCreationReject) {
         if (isAdmin && !reasonTrim) {
           updateData.statusRejectReason = null;
         } else if (!reasonTrim) {

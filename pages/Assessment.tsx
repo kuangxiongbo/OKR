@@ -205,6 +205,7 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
     const isHRBP = user.role === Role.HRBP || user.role === Role.ADMIN;
     const canArchive = isHRBP && selectedOKR.status === OKRStatus.PENDING_ARCHIVE && !selectedOKR.isPerformanceArchived;
     const canUnarchive = isHRBP && (selectedOKR.status === OKRStatus.CLOSED || selectedOKR.isPerformanceArchived);
+    const canCancelFinalReview = user.role === Role.ADMIN && selectedOKR.status === OKRStatus.PENDING_ARCHIVE && !selectedOKR.isPerformanceArchived;
 
     const showManagerColumn = user.role === Role.ADMIN || (!isSelf && !isPeer && !isCCUser) || (isSelf && (selectedOKR.status === OKRStatus.CLOSED || selectedOKR.isPerformanceArchived));
 
@@ -565,6 +566,16 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
         }, "warning");
     };
 
+    const handleCancelFinalReview = () => {
+        const targetStatus = l3 ? OKRStatus.PENDING_L3_APPROVAL : OKRStatus.PENDING_L2_APPROVAL;
+        onConfirm("确认取消终审", "取消终审后，该记录将退回终审状态，可重新终审通过或驳回。", async () => {
+            await updateOKRStatus(selectedOKR.id, targetStatus, { isPerformanceArchived: false });
+            onRefresh();
+            onClose();
+            onAlert("操作成功", "已取消终审，记录已退回终审状态。", "success");
+        }, "warning");
+    };
+
     // ... (Render Modal Content - Identical to original) ...
     return (
         <>
@@ -829,6 +840,7 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
                             (canGradeDetails || canAdjustGrade) && !isVetoStage && <button onClick={handleManagerConfirm} className="px-6 py-2 bg-brand-600 text-white rounded hover:bg-brand-700 flex items-center gap-2">保存 & 完成</button>
                         )}
                         {isVetoStage && <button onClick={handleExecutiveVeto} className="px-4 py-2 bg-white border border-red-600 text-red-600 rounded hover:bg-red-50 flex items-center gap-2 font-bold shadow-sm"><ThumbsDown size={16} /> 一票否决 (退回重评)</button>}
+                        {canCancelFinalReview && <button onClick={handleCancelFinalReview} className="px-4 py-2 bg-white border border-amber-200 text-amber-700 rounded hover:bg-amber-50 flex items-center gap-2 font-bold"><RotateCcw size={16} /> 取消终审</button>}
                         {canArchive && <button onClick={() => { handleArchivePerformance(selectedOKR.department || '该部门', [selectedOKR]); }} className="px-6 py-2 bg-brand-600 text-white rounded hover:bg-brand-700 flex items-center gap-2 font-medium"><CheckSquare size={18} /> 绩效归档发布</button>}
                         {canUnarchive && <button onClick={handleUnarchivePerformance} className="px-4 py-2 bg-white border border-cyan-200 text-cyan-700 rounded hover:bg-cyan-50 flex items-center gap-2 font-bold"><RotateCcw size={16} /> 取消归档</button>}
                     </div>
@@ -1258,6 +1270,19 @@ export const Assessment: React.FC = () => {
         }, "warning");
     };
 
+    const handleCancelFinalReview = (deptName: string, deptOkrs: OKR[]) => {
+        if (deptOkrs.length === 0) return;
+        openConfirm("确认取消终审", `确认取消 ${deptName} 的 ${deptOkrs.length} 条终审结果？取消后将退回终审状态。`, async () => {
+            await Promise.all(deptOkrs.map(async (o) => {
+                const { l3 } = getApproverRoles(o);
+                const targetStatus = l3 ? OKRStatus.PENDING_L3_APPROVAL : OKRStatus.PENDING_L2_APPROVAL;
+                await updateOKRStatus(o.id, targetStatus, { isPerformanceArchived: false });
+            }));
+            refreshData();
+            openAlert("操作成功", `${deptName} 已取消终审，记录已退回终审状态。`, "success");
+        }, "warning");
+    };
+
     const renderTable = (list: OKR[], title: string, subtitle?: string) => {
         if (!list || list.length === 0) return null;
         return (
@@ -1531,6 +1556,7 @@ export const Assessment: React.FC = () => {
                             {teamSubDepts.map(dept => {
                                 const deptUsersCount = allUsers.filter(u => u.department === dept && !isCadre(u.role)).length;
                                 const deptOKRs = memberOKRs.filter(o => o.department === dept);
+                                const activeDeptOKRs = deptOKRs.filter(o => !o.isPerformanceArchived && o.status !== OKRStatus.CLOSED);
                                 const submittedCount = deptOKRs.filter(o => o.status === OKRStatus.PENDING_L2_APPROVAL || o.status === OKRStatus.PENDING_L3_APPROVAL || o.status === OKRStatus.PENDING_ARCHIVE || o.status === OKRStatus.CLOSED || o.isPerformanceArchived).length;
                                 const isSubmitted = submittedCount > 0;
                                 const gradedDeptOKRs = deptOKRs.filter(o => o.finalGrade && o.finalGrade !== FinalGrade.PENDING);
@@ -1538,10 +1564,26 @@ export const Assessment: React.FC = () => {
                                 const isFullySubmitted = deptOKRs.length > 0 && submittedCount >= deptOKRs.length;
                                 const stats = aggregateMemberStats(gradedDeptOKRs);
                                 const overLimit = stats.find(s => s.isOver);
-                                const deptReviewOKRs = deptOKRs.filter(o => o.status === OKRStatus.PENDING_L2_APPROVAL || o.status === OKRStatus.PENDING_L3_APPROVAL);
-                                const deptActionOKRs = deptReviewOKRs;
+                                const deptPendingArchiveOKRs = activeDeptOKRs.filter(o => o.status === OKRStatus.PENDING_ARCHIVE);
+                                const deptReviewOKRs = activeDeptOKRs.filter(o => o.status === OKRStatus.PENDING_L2_APPROVAL || o.status === OKRStatus.PENDING_L3_APPROVAL);
+                                const deptActionOKRs = deptReviewOKRs.filter(o => {
+                                    const { l2, l3 } = getApproverRoles(o);
+                                    if (o.status === OKRStatus.PENDING_L2_APPROVAL) return user.role === l2;
+                                    if (o.status === OKRStatus.PENDING_L3_APPROVAL) return user.role === l3;
+                                    return false;
+                                });
                                 const isFinalReviewDept = deptActionOKRs.some(o => o.status === OKRStatus.PENDING_L3_APPROVAL);
                                 const canApproveDept = isFullySubmitted && deptActionOKRs.length > 0;
+                                const canRejectDept = deptActionOKRs.length > 0;
+                                const canCancelFinalReviewDept = isAdmin && deptPendingArchiveOKRs.length > 0;
+                                const deptStatusText =
+                                    activeDeptOKRs.length > 0 && activeDeptOKRs.every(o => o.status === OKRStatus.PENDING_ARCHIVE)
+                                        ? '已终审 (待归档)'
+                                        : isFinalReviewDept || activeDeptOKRs.some(o => o.status === OKRStatus.PENDING_L3_APPROVAL)
+                                            ? '已提交 (待终审)'
+                                            : activeDeptOKRs.some(o => o.status === OKRStatus.PENDING_L2_APPROVAL)
+                                                ? '已提交 (待二审)'
+                                                : isFullySubmitted ? '已提交' : `部分提交 (${submittedCount}/${deptUsersCount})`;
 
                                 return (
                                     <div key={dept} onClick={() => { if (isSubmitted) { setTeamViewFilterDept(dept); setActiveTab('TEAM_MEMBERS'); } }} className={`relative overflow-hidden rounded-xl border p-5 transition-all ${isSubmitted ? 'bg-white border-slate-200 shadow-sm hover:shadow-md hover:border-brand-300 cursor-pointer group' : 'bg-slate-50 border-slate-200 opacity-70 cursor-not-allowed'}`}>
@@ -1551,7 +1593,7 @@ export const Assessment: React.FC = () => {
                                                 <p className="text-xs text-slate-500 mt-1">成员: {deptUsersCount} 人 · 已定级: {gradedCount}/{deptUsersCount}</p>
                                             </div>
                                             <span className={`px-2 py-1 rounded text-xs font-bold border ${isSubmitted ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
-                                                {isSubmitted ? (isFullySubmitted ? '已提交 (待终审)' : `部分提交 (${submittedCount}/${deptUsersCount})`) : '未提交'}
+                                                {isSubmitted ? deptStatusText : '未提交'}
                                             </span>
                                         </div>
                                         {isSubmitted ? (
@@ -1575,12 +1617,23 @@ export const Assessment: React.FC = () => {
                                                 >
                                                     {isFinalReviewDept ? '终审通过' : '同意该部门'}
                                                 </button>
+                                                {canCancelFinalReviewDept && (
+                                                    <button
+                                                        onClick={(event) => {
+                                                            event.stopPropagation();
+                                                            handleCancelFinalReview(dept, deptPendingArchiveOKRs);
+                                                        }}
+                                                        className="text-xs font-bold text-amber-700 border border-amber-200 px-2.5 py-1.5 rounded hover:bg-amber-50"
+                                                    >
+                                                        取消终审
+                                                    </button>
+                                                )}
                                                 <button
                                                     onClick={(event) => {
                                                         event.stopPropagation();
                                                         handleBatchRejectCrossLevel(deptActionOKRs);
                                                     }}
-                                                    disabled={deptActionOKRs.length === 0}
+                                                    disabled={!canRejectDept}
                                                     className="text-xs font-bold text-red-600 border border-red-200 px-2.5 py-1.5 rounded hover:bg-red-50 disabled:text-slate-400 disabled:border-slate-200 disabled:bg-slate-50 disabled:cursor-not-allowed"
                                                 >
                                                     驳回该部门
