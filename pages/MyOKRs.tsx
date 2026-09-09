@@ -23,7 +23,7 @@ const statusLabels: Record<OKRStatus, string> = {
     [OKRStatus.PENDING_ASSESSMENT_APPROVAL]: '已发布',
     [OKRStatus.PENDING_L2_APPROVAL]: '已发布',
     [OKRStatus.PENDING_L3_APPROVAL]: '已发布',
-    [OKRStatus.PENDING_ARCHIVE]: '已归档',
+    [OKRStatus.PENDING_ARCHIVE]: '待归档',
 };
 
 const distributeWeights = <T extends { weight: number }>(items: T[]): T[] => {

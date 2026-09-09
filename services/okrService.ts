@@ -1016,7 +1016,7 @@ export const createOKR = (user: User, level: OKRLevel): OKR => {
 export const updateOKRStatus = async (
     id: string,
     status: OKRStatus,
-    options?: { statusRejectReason?: string }
+    options?: { statusRejectReason?: string; isPerformanceArchived?: boolean }
 ) => {
     console.log('[updateOKRStatus] 开始更新状态:', id, '新状态:', status);
     
@@ -1054,7 +1054,7 @@ export const updateOKRStatus = async (
                 id,
                 status,
                 versionToSend,
-                options?.statusRejectReason
+                options
             );
             console.log('[updateOKRStatus] API 响应:', result);
             

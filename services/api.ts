@@ -138,13 +138,14 @@ export const okrsAPI = {
     method: 'PUT',
     body: JSON.stringify(okr),
   }),
-  updateStatus: (id: string, status: string, version?: number, statusRejectReason?: string) =>
+  updateStatus: (id: string, status: string, version?: number, options?: { statusRejectReason?: string; isPerformanceArchived?: boolean }) =>
     request<{ success: boolean; data?: { okr: any } }>(`/v1/okrs/${id}/status`, {
       method: 'PATCH',
       body: JSON.stringify({
         status,
         version,
-        ...(statusRejectReason !== undefined ? { statusRejectReason } : {}),
+        ...(options?.statusRejectReason !== undefined ? { statusRejectReason: options.statusRejectReason } : {}),
+        ...(options?.isPerformanceArchived !== undefined ? { isPerformanceArchived: options.isPerformanceArchived } : {}),
       }),
     }),
   delete: (id: string) => request<{ success: boolean }>(`/v1/okrs/${id}`, {

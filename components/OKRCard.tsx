@@ -10,6 +10,7 @@ const statusColors: Record<string, string> = {
   [OKRStatus.PENDING_MANAGER]: 'bg-orange-100 text-orange-700',
   [OKRStatus.PENDING_GM]: 'bg-purple-100 text-purple-700',
   [OKRStatus.PUBLISHED]: 'bg-green-100 text-green-700',
+  [OKRStatus.PENDING_ARCHIVE]: 'bg-cyan-100 text-cyan-700',
   [OKRStatus.CLOSED]: 'bg-slate-200 text-slate-800',
 };
 
@@ -19,6 +20,7 @@ const statusLabels: Record<string, string> = {
     [OKRStatus.PENDING_MANAGER]: '已提交',
     [OKRStatus.PENDING_GM]: '已提交',
     [OKRStatus.PUBLISHED]: '已发布',
+    [OKRStatus.PENDING_ARCHIVE]: '待归档',
     [OKRStatus.CLOSED]: '已归档',
 };
 
@@ -45,9 +47,12 @@ export const OKRCard: React.FC<{
   // Logic to unify display status for dashboard
   // "Dashboard Statuses: Only Published and Archived"
   const displayStatus = useMemo(() => {
-      // If it's closed or archived, show as Archived (CLOSED)
-      if (okr.status === OKRStatus.CLOSED || okr.status === OKRStatus.PENDING_ARCHIVE || okr.isPerformanceArchived) {
+      // Only records explicitly archived by HR/admin should be shown as archived.
+      if (okr.status === OKRStatus.CLOSED || okr.isPerformanceArchived) {
           return OKRStatus.CLOSED;
+      }
+      if (okr.status === OKRStatus.PENDING_ARCHIVE) {
+          return OKRStatus.PENDING_ARCHIVE;
       }
       // If it's a draft, show Draft (usually hidden from dashboard unless Admin)
       if (okr.status === OKRStatus.DRAFT) {

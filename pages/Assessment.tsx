@@ -4,7 +4,7 @@ import { getOKRs, saveOKR, calculateOKRTotalScore, calculateObjScoreFromKRs, det
 import { useCurrentUser } from '../hooks/useCurrentUser';
 import { OKR, OKRStatus, Role, FinalGrade, GradeConfiguration, User, ApprovalWorkflow, ROLE_NAMES, OKRLevel } from '../types';
 import { getOKRScopeTypeLabel } from '../utils/okrScope';
-import { Star, Send, User as UserIcon, Users, Edit, BarChart3, CheckCircle2, ShieldCheck, UserCheck, CheckSquare, AlertTriangle, Lock, UserCog, PieChart, GitMerge, Crown, ArrowRight, MessageCircle, LayoutGrid, Briefcase, Loader2, Building, ChevronRight, Cloud, CloudFog, Eye, ThumbsUp, ThumbsDown, ClipboardList, Calendar } from 'lucide-react';
+import { Star, Send, User as UserIcon, Users, Edit, BarChart3, CheckCircle2, ShieldCheck, UserCheck, CheckSquare, AlertTriangle, Lock, UserCog, PieChart, GitMerge, Crown, ArrowRight, MessageCircle, LayoutGrid, Briefcase, Loader2, Building, ChevronRight, Cloud, CloudFog, Eye, ThumbsUp, ThumbsDown, ClipboardList, Calendar, RotateCcw } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { RejectReasonDialog } from '../components/RejectReasonDialog';
 
@@ -204,6 +204,7 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
 
     const isHRBP = user.role === Role.HRBP || user.role === Role.ADMIN;
     const canArchive = isHRBP && selectedOKR.status === OKRStatus.PENDING_ARCHIVE && !selectedOKR.isPerformanceArchived;
+    const canUnarchive = isHRBP && (selectedOKR.status === OKRStatus.CLOSED || selectedOKR.isPerformanceArchived);
 
     const showManagerColumn = user.role === Role.ADMIN || (!isSelf && !isPeer && !isCCUser) || (isSelf && (selectedOKR.status === OKRStatus.CLOSED || selectedOKR.isPerformanceArchived));
 
@@ -555,6 +556,15 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
         }, "success");
     }
 
+    const handleUnarchivePerformance = () => {
+        onConfirm("确认取消归档", "取消归档后，该记录将恢复为待归档状态，可重新归档发布。", async () => {
+            await updateOKRStatus(selectedOKR.id, OKRStatus.PENDING_ARCHIVE, { isPerformanceArchived: false });
+            onRefresh();
+            onClose();
+            onAlert("操作成功", "已取消归档，记录已恢复为待归档。", "success");
+        }, "warning");
+    };
+
     // ... (Render Modal Content - Identical to original) ...
     return (
         <>
@@ -820,6 +830,7 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
                         )}
                         {isVetoStage && <button onClick={handleExecutiveVeto} className="px-4 py-2 bg-white border border-red-600 text-red-600 rounded hover:bg-red-50 flex items-center gap-2 font-bold shadow-sm"><ThumbsDown size={16} /> 一票否决 (退回重评)</button>}
                         {canArchive && <button onClick={() => { handleArchivePerformance(selectedOKR.department || '该部门', [selectedOKR]); }} className="px-6 py-2 bg-brand-600 text-white rounded hover:bg-brand-700 flex items-center gap-2 font-medium"><CheckSquare size={18} /> 绩效归档发布</button>}
+                        {canUnarchive && <button onClick={handleUnarchivePerformance} className="px-4 py-2 bg-white border border-cyan-200 text-cyan-700 rounded hover:bg-cyan-50 flex items-center gap-2 font-bold"><RotateCcw size={16} /> 取消归档</button>}
                     </div>
                 </div>
             </div>
@@ -1041,6 +1052,13 @@ export const Assessment: React.FC = () => {
         acc[dept].push(okr);
         return acc;
     }, {} as Record<string, OKR[]>);
+    const archivedOKRs = isHRBP ? okrs.filter(o => o.status === OKRStatus.CLOSED || o.isPerformanceArchived) : [];
+    const archivedByDept = archivedOKRs.reduce((acc, okr) => {
+        const dept = okr.department || '其他';
+        if (!acc[dept]) acc[dept] = [];
+        acc[dept].push(okr);
+        return acc;
+    }, {} as Record<string, OKR[]>);
 
     const displayedMemberOKRs = teamViewFilterDept ? memberOKRs.filter(o => o.department === teamViewFilterDept) : memberOKRs;
     const directReports = displayedMemberOKRs.filter(o => getApproverRoles(o).l1 === user.role);
@@ -1228,6 +1246,16 @@ export const Assessment: React.FC = () => {
             refreshData();
             openAlert("操作成功", `${deptName} 绩效已归档发布。`, "success");
         }, "success");
+    };
+
+    const handleUnarchivePerformance = (deptName: string, deptOkrs: OKR[]) => {
+        openConfirm("确认取消归档", `确认取消 ${deptName} 的 ${deptOkrs.length} 条已归档绩效？取消后将恢复为待归档状态。`, async () => {
+            await Promise.all(deptOkrs.map(async (o) => {
+                await updateOKRStatus(o.id, OKRStatus.PENDING_ARCHIVE, { isPerformanceArchived: false });
+            }));
+            refreshData();
+            openAlert("操作成功", `${deptName} 已取消归档，记录已恢复为待归档。`, "success");
+        }, "warning");
     };
 
     const renderTable = (list: OKR[], title: string, subtitle?: string) => {
@@ -1511,9 +1539,8 @@ export const Assessment: React.FC = () => {
                                 const stats = aggregateMemberStats(gradedDeptOKRs);
                                 const overLimit = stats.find(s => s.isOver);
                                 const deptReviewOKRs = deptOKRs.filter(o => o.status === OKRStatus.PENDING_L2_APPROVAL || o.status === OKRStatus.PENDING_L3_APPROVAL);
-                                const deptFinalReviewOKRs = deptOKRs.filter(o => o.status === OKRStatus.PENDING_ARCHIVE && !o.isPerformanceArchived);
-                                const deptActionOKRs = deptFinalReviewOKRs.length > 0 ? deptFinalReviewOKRs : deptReviewOKRs;
-                                const isFinalReviewDept = deptFinalReviewOKRs.length > 0;
+                                const deptActionOKRs = deptReviewOKRs;
+                                const isFinalReviewDept = deptActionOKRs.some(o => o.status === OKRStatus.PENDING_L3_APPROVAL);
                                 const canApproveDept = isFullySubmitted && deptActionOKRs.length > 0;
 
                                 return (
@@ -1541,11 +1568,7 @@ export const Assessment: React.FC = () => {
                                                 <button
                                                     onClick={(event) => {
                                                         event.stopPropagation();
-                                                        if (isFinalReviewDept) {
-                                                            handleArchivePerformance(dept, deptActionOKRs);
-                                                        } else {
-                                                            handleUnifiedBatchApprove(deptActionOKRs);
-                                                        }
+                                                        handleUnifiedBatchApprove(deptActionOKRs);
                                                     }}
                                                     disabled={!canApproveDept}
                                                     className="text-xs font-bold text-brand-600 border border-brand-200 px-2.5 py-1.5 rounded hover:bg-brand-50 disabled:text-slate-400 disabled:border-slate-200 disabled:bg-slate-50 disabled:cursor-not-allowed"
@@ -1634,26 +1657,61 @@ export const Assessment: React.FC = () => {
                     <div className="flex justify-between items-center bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                         <div>
                             <h3 className="font-bold text-slate-800 text-lg mb-1">归档发布中心</h3>
-                            <p className="text-slate-500 text-sm">将所有已完成上级评分 (待归档) 的 OKR 按部门统一发布，发布后员工可查看结果。</p>
+                            <p className="text-slate-500 text-sm">将待归档 OKR 按部门统一发布；已归档团队可查看明细，也可取消归档恢复为待归档。</p>
                         </div>
                     </div>
-                    {Object.keys(pendingArchiveByDept).length === 0 && <div className="p-10 text-center bg-white rounded-xl border border-dashed border-slate-300 text-slate-400">当前没有等待归档的记录。</div>}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {Object.entries(pendingArchiveByDept).map(([deptName, val]) => {
-                            const deptOkrs = val as OKR[];
-                            return (
-                                <div key={deptName} className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition-shadow">
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div className="flex items-center gap-2"><div className="bg-cyan-100 text-cyan-600 p-2 rounded-lg"><Building size={20} /></div><div><h4 className="font-bold text-slate-800">{deptName}</h4><p className="text-xs text-slate-500">待归档: {deptOkrs.length} 人</p></div></div>
+                    <div>
+                        <h4 className="font-bold text-slate-700 text-sm mb-3 flex items-center gap-2"><CheckSquare size={16} /> 待归档团队</h4>
+                        {Object.keys(pendingArchiveByDept).length === 0 && <div className="p-10 text-center bg-white rounded-xl border border-dashed border-slate-300 text-slate-400">当前没有等待归档的记录。</div>}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {Object.entries(pendingArchiveByDept).map(([deptName, val]) => {
+                                const deptOkrs = val as OKR[];
+                                return (
+                                    <div key={deptName} className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition-shadow">
+                                        <div className="flex justify-between items-start mb-4">
+                                            <div className="flex items-center gap-2"><div className="bg-cyan-100 text-cyan-600 p-2 rounded-lg"><Building size={20} /></div><div><h4 className="font-bold text-slate-800">{deptName}</h4><p className="text-xs text-slate-500">待归档: {deptOkrs.length} 人</p></div></div>
+                                        </div>
+                                        <div className="space-y-2 mb-4">
+                                            {deptOkrs.slice(0, 3).map(okr => (
+                                                <button key={okr.id} onClick={() => setSelectedOKR(okr)} className="w-full flex justify-between text-xs text-slate-600 bg-slate-50 hover:bg-slate-100 p-2 rounded text-left">
+                                                    <span>{okr.userName}</span><span className="font-bold text-indigo-600">{okr.finalGrade} ({okr.totalScore})</span>
+                                                </button>
+                                            ))}
+                                            {deptOkrs.length > 3 && <div className="text-center text-xs text-slate-400">... 以及其他 {deptOkrs.length - 3} 人</div>}
+                                        </div>
+                                        <button onClick={() => handleArchivePerformance(deptName, deptOkrs)} className="w-full bg-cyan-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-cyan-700 flex items-center justify-center gap-2 transition-colors"><CheckSquare size={16} /> 绩效归档发布</button>
                                     </div>
-                                    <div className="space-y-2 mb-4">
-                                        {deptOkrs.slice(0, 3).map(okr => <div key={okr.id} className="flex justify-between text-xs text-slate-600 bg-slate-50 p-2 rounded"><span>{okr.userName}</span><span className="font-bold text-indigo-600">{okr.finalGrade} ({okr.totalScore})</span></div>)}
-                                        {deptOkrs.length > 3 && <div className="text-center text-xs text-slate-400">... 以及其他 {deptOkrs.length - 3} 人</div>}
+                                )
+                            })}
+                        </div>
+                    </div>
+
+                    <div>
+                        <h4 className="font-bold text-slate-700 text-sm mb-3 flex items-center gap-2"><Lock size={16} /> 已归档团队</h4>
+                        {Object.keys(archivedByDept).length === 0 && <div className="p-10 text-center bg-white rounded-xl border border-dashed border-slate-300 text-slate-400">当前没有已归档的记录。</div>}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {Object.entries(archivedByDept).map(([deptName, val]) => {
+                                const deptOkrs = val as OKR[];
+                                return (
+                                    <div key={deptName} className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition-shadow">
+                                        <div className="flex justify-between items-start mb-4">
+                                            <div className="flex items-center gap-2"><div className="bg-slate-100 text-slate-600 p-2 rounded-lg"><Building size={20} /></div><div><h4 className="font-bold text-slate-800">{deptName}</h4><p className="text-xs text-slate-500">已归档: {deptOkrs.length} 人</p></div></div>
+                                        </div>
+                                        <div className="space-y-2 mb-4">
+                                            {deptOkrs.slice(0, 5).map(okr => (
+                                                <div key={okr.id} className="flex items-center justify-between gap-2 text-xs text-slate-600 bg-slate-50 p-2 rounded">
+                                                    <span className="truncate">{okr.userName}</span>
+                                                    <span className="font-bold text-indigo-600 whitespace-nowrap">{okr.finalGrade} ({okr.totalScore})</span>
+                                                    <button onClick={() => setSelectedOKR(okr)} className="text-brand-600 font-bold hover:underline whitespace-nowrap">查看</button>
+                                                </div>
+                                            ))}
+                                            {deptOkrs.length > 5 && <div className="text-center text-xs text-slate-400">... 以及其他 {deptOkrs.length - 5} 人</div>}
+                                        </div>
+                                        <button onClick={() => handleUnarchivePerformance(deptName, deptOkrs)} className="w-full bg-white text-cyan-700 border border-cyan-200 px-4 py-2 rounded-lg text-sm font-bold hover:bg-cyan-50 flex items-center justify-center gap-2 transition-colors"><RotateCcw size={16} /> 取消归档</button>
                                     </div>
-                                    <button onClick={() => handleArchivePerformance(deptName, deptOkrs)} className="w-full bg-cyan-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-cyan-700 flex items-center justify-center gap-2 transition-colors"><CheckSquare size={16} /> 绩效归档发布</button>
-                                </div>
-                            )
-                        })}
+                                )
+                            })}
+                        </div>
                     </div>
                 </div>
             )}

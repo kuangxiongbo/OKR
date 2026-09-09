@@ -46,7 +46,10 @@ export const STATUS_TRANSITIONS: Record<OKRStatus, OKRStatus[]> = {
     OKRStatus.PENDING_ASSESSMENT_APPROVAL, // 允许一票否决，退回至评分阶段
     OKRStatus.DRAFT // 允许管理员重置为草稿
   ],
-  [OKRStatus.CLOSED]: [OKRStatus.DRAFT] // 允许从终态重置（仅限管理员/特权操作）
+  [OKRStatus.CLOSED]: [
+    OKRStatus.PENDING_ARCHIVE, // 取消归档，恢复到待归档发布
+    OKRStatus.DRAFT // 允许从终态重置（仅限管理员/特权操作）
+  ]
 };
 
 // 验证状态转换是否允许
