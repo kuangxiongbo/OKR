@@ -1,4 +1,4 @@
-import { query } from '../config/database';
+import { query, withTransaction } from '../config/database';
 import { User, Role } from '../types';
 import bcrypt from 'bcryptjs';
 
@@ -148,7 +148,14 @@ export class UserModel {
   }
 
   static async delete(id: string): Promise<void> {
-    await query('DELETE FROM users WHERE id = $1', [id]);
+    await withTransaction(async (client) => {
+      await client.query('DELETE FROM okr_history WHERE changed_by = $1', [id]);
+      await client.query('DELETE FROM operation_logs WHERE user_id = $1', [id]);
+      await client.query('UPDATE okrs SET created_by = NULL WHERE created_by = $1', [id]);
+      await client.query('UPDATE okrs SET updated_by = NULL WHERE updated_by = $1', [id]);
+      await client.query('UPDATE configs SET updated_by = NULL WHERE updated_by = $1', [id]);
+      await client.query('DELETE FROM users WHERE id = $1', [id]);
+    });
   }
 
   static async verifyPassword(plainPassword: string, hashedPassword: string): Promise<boolean> {

@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { randomUUID } from 'crypto';
 import { UserModel } from '../models/User';
 import { AppError, ErrorCode, createSuccessResponse } from '../utils/errors';
 import { OperationLogModel } from '../models/OperationLog';
@@ -59,7 +60,7 @@ export const createUser = async (req: Request, res: Response) => {
 
     // 记录日志
     await OperationLogModel.create({
-      id: `log-${Date.now()}`,
+      id: randomUUID(),
       userId,
       userName: req.body.userName || 'System',
       action: 'CREATE_USER',
@@ -104,7 +105,7 @@ export const updateUser = async (req: Request, res: Response) => {
 
     // 记录日志
     await OperationLogModel.create({
-      id: `log-${Date.now()}`,
+      id: randomUUID(),
       userId,
       userName: req.body.userName || 'System',
       action: 'UPDATE_USER',
@@ -135,19 +136,26 @@ export const deleteUser = async (req: Request, res: Response) => {
       throw new AppError(ErrorCode.USER_NOT_FOUND, '用户不存在', 404);
     }
 
+    const actor = userId !== id ? await UserModel.findById(userId) : null;
+
     await UserModel.delete(id);
 
-    // 记录日志
-    await OperationLogModel.create({
-      id: `log-${Date.now()}`,
-      userId,
-      userName: req.body.userName || 'System',
-      action: 'DELETE_USER',
-      module: 'USER_MGMT',
-      details: `删除用户: ${user.name}`,
-      ip: req.ip || '',
-      timestamp: new Date().toISOString()
-    });
+    if (actor) {
+      try {
+        await OperationLogModel.create({
+          id: randomUUID(),
+          userId,
+          userName: actor.name || req.body.userName || 'System',
+          action: 'DELETE_USER',
+          module: 'USER_MGMT',
+          details: `删除用户: ${user.name}`,
+          ip: req.ip || '',
+          timestamp: new Date().toISOString()
+        });
+      } catch (logError) {
+        console.warn('Delete user log skipped:', logError);
+      }
+    }
 
     res.json(createSuccessResponse());
   } catch (error) {
