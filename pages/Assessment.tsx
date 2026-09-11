@@ -1057,6 +1057,8 @@ export const Assessment: React.FC = () => {
         const targetUser = allUsers.find(u => u.id === o.userId);
         return targetUser && isLeaderUser(targetUser);
     });
+    const leaderTeamOKRs = sortByGradeAndScore(leaderOKRs.filter(o => o.level !== OKRLevel.PERSONAL));
+    const leaderPersonalOKRs = sortByGradeAndScore(leaderOKRs.filter(o => o.level === OKRLevel.PERSONAL));
 
     const memberOKRs = allAccessibleTeamOKRs.filter(o => {
         const targetUser = allUsers.find(u => u.id === o.userId);
@@ -1725,7 +1727,8 @@ export const Assessment: React.FC = () => {
                         </div>
                     </div>
                     {leaderOKRs.length === 0 && <div className="p-10 text-center bg-white rounded-xl border border-dashed border-slate-300 text-slate-400 mt-6">暂无干部评估数据。</div>}
-                    {renderTable(leaderOKRs, "管理者列表")}
+                    {renderTable(leaderTeamOKRs, "管理者团队 OKR", "以下为您管理的干部团队目标。")}
+                    {renderTable(leaderPersonalOKRs, "管理者个人 OKR", "以下为您管理的干部个人目标。")}
                 </div>
             )}
 
