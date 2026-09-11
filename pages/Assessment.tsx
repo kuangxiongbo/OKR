@@ -4,7 +4,7 @@ import { getOKRs, saveOKR, calculateOKRTotalScore, calculateObjScoreFromKRs, det
 import { useCurrentUser } from '../hooks/useCurrentUser';
 import { OKR, OKRStatus, Role, FinalGrade, GradeConfiguration, User, ApprovalWorkflow, ROLE_NAMES, OKRLevel } from '../types';
 import { getOKRScopeTypeLabel } from '../utils/okrScope';
-import { Star, Send, User as UserIcon, Users, Edit, BarChart3, CheckCircle2, ShieldCheck, UserCheck, CheckSquare, AlertTriangle, Lock, UserCog, PieChart, GitMerge, Crown, ArrowRight, MessageCircle, LayoutGrid, Briefcase, Loader2, Building, ChevronRight, Cloud, CloudFog, Eye, ThumbsUp, ThumbsDown, ClipboardList, Calendar, RotateCcw } from 'lucide-react';
+import { Star, Send, User as UserIcon, Users, Edit, BarChart3, CheckCircle2, ShieldCheck, UserCheck, CheckSquare, AlertTriangle, Lock, UserCog, PieChart, GitMerge, Crown, ArrowRight, MessageCircle, LayoutGrid, Briefcase, Loader2, Building, ChevronRight, Cloud, CloudFog, Eye, ThumbsUp, ThumbsDown, ClipboardList, Calendar, RotateCcw, Download } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { RejectReasonDialog } from '../components/RejectReasonDialog';
 
@@ -27,6 +27,36 @@ const getAssessmentScore = (okr: OKR) => okr.totalScore ?? okr.overallManagerAss
 const getGradeTextClass = (grade?: string) => grade === 'S' ? 'text-yellow-500' : grade === 'A' ? 'text-green-500' : grade === 'B' || grade === 'B-' ? 'text-blue-500' : 'text-slate-500';
 const getGradeBadgeClass = (grade?: string) => grade === 'S' ? 'bg-yellow-100 text-yellow-700 border border-yellow-200' : grade === 'A' ? 'bg-green-100 text-green-700 border border-green-200' : grade === 'B' || grade === 'B-' ? 'bg-blue-100 text-blue-700 border border-blue-200' : grade === 'C' ? 'bg-slate-100 text-slate-600 border border-slate-300' : 'bg-slate-50 text-slate-400 border border-slate-200';
 const getGradeBarClass = (grade?: string) => grade === 'S' ? 'bg-yellow-400' : grade === 'A' ? 'bg-green-400' : grade === 'B' || grade === 'B-' ? 'bg-blue-400' : 'bg-slate-300';
+const isSubmittedAssessmentOKR = (okr: OKR) =>
+    okr.isPerformanceArchived ||
+    (
+        okr.status !== OKRStatus.DRAFT &&
+        okr.status !== OKRStatus.PENDING_MANAGER &&
+        okr.status !== OKRStatus.PENDING_GM &&
+        okr.status !== OKRStatus.PUBLISHED
+    );
+
+const getAssessmentStatusLabel = (okr: OKR) => {
+    if (okr.isPerformanceArchived || okr.status === OKRStatus.CLOSED) return '已归档';
+    if (okr.status === OKRStatus.PUBLISHED) return '草稿/自评中';
+    if (okr.status === OKRStatus.PENDING_ASSESSMENT_APPROVAL) return '待一级评分';
+    if (okr.status === OKRStatus.GRADING) return '评分中';
+    if (okr.status === OKRStatus.PENDING_L2_APPROVAL) return '待二级审批';
+    if (okr.status === OKRStatus.PENDING_L3_APPROVAL) return '待三级审批';
+    if (okr.status === OKRStatus.PENDING_ARCHIVE) return '已终审/待归档';
+    if (okr.status === OKRStatus.PENDING_MANAGER) return '创建待一级审批';
+    if (okr.status === OKRStatus.PENDING_GM) return '创建待二级审批';
+    return '草稿';
+};
+
+const escapeExcelHtml = (value: unknown) => String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+const formatScore = (score: number | null | undefined) => score === null || score === undefined ? '' : Number(score).toFixed(1);
 
 const sortByGradeAndScore = (list: OKR[]) => {
     return [...list].sort((a, b) => {
@@ -1201,6 +1231,78 @@ export const Assessment: React.FC = () => {
     };
     const currentDistStats = aggregateMemberStats(displayedMemberOKRs.filter(o => o.finalGrade && o.finalGrade !== FinalGrade.PENDING));
 
+    const getTeamMemberExportRows = () => sortByGradeAndScore(
+        displayedMemberOKRs.filter(o => o.level === OKRLevel.PERSONAL && isSubmittedAssessmentOKR(o))
+    );
+
+    const formatOKRDetailForExport = (okr: OKR) => {
+        return okr.objectives.map((obj, objIndex) => {
+            const objectiveLines = [
+                `${objIndex + 1}. O：${obj.content}`,
+                `   权重：${obj.weight}%`,
+                `   自评分：${formatScore(obj.selfScore)}`,
+                `   自评：${obj.selfComment || ''}`,
+                `   上级评分：${formatScore(obj.managerScore)}`,
+                `   上级评价：${obj.managerComment || ''}`
+            ];
+            const krLines = obj.keyResults.map((kr, krIndex) => [
+                `   ${objIndex + 1}.${krIndex + 1} KR：${kr.content}`,
+                `      权重：${kr.weight}%`,
+                `      自评分：${formatScore(kr.selfScore)}`,
+                `      自评：${kr.selfComment || ''}`,
+                `      上级评分：${formatScore(kr.managerScore)}`,
+                `      上级评价：${kr.managerComment || ''}`
+            ].join('\n'));
+            return [...objectiveLines, ...krLines].join('\n');
+        }).join('\n\n');
+    };
+
+    const handleExportTeamMemberAssessment = () => {
+        const exportRows = getTeamMemberExportRows();
+        if (exportRows.length === 0) {
+            openAlert('暂无可导出数据', '当前没有已提交的个人评估记录可导出。', 'warning');
+            return;
+        }
+
+        const columns = ['排名', '姓名', '业务线/部门', 'OKR类型', 'OKR标题', '周期', '状态', '定级', '评分', '自评分', '自评', '上级评分', '上级评价', '目标与KR明细'];
+        const rows = exportRows.map((okr, index) => {
+            const score = getAssessmentScore(okr);
+            return [
+                index + 1,
+                okr.userName,
+                okr.department || '',
+                getOKRScopeTypeLabel(okr.level),
+                okr.title,
+                okr.period,
+                getAssessmentStatusLabel(okr),
+                okr.finalGrade || FinalGrade.PENDING,
+                formatScore(score),
+                formatScore(okr.overallSelfAssessment?.score),
+                okr.overallSelfAssessment?.comment || '',
+                formatScore(okr.overallManagerAssessment?.score),
+                okr.overallManagerAssessment?.comment || '',
+                formatOKRDetailForExport(okr)
+            ];
+        });
+
+        const tableHtml = [
+            '<table border="1">',
+            `<thead><tr>${columns.map(col => `<th>${escapeExcelHtml(col)}</th>`).join('')}</tr></thead>`,
+            `<tbody>${rows.map(row => `<tr>${row.map(cell => `<td style="mso-number-format:'\\@';white-space:pre-wrap;">${escapeExcelHtml(cell)}</td>`).join('')}</tr>`).join('')}</tbody>`,
+            '</table>'
+        ].join('');
+        const html = `<!doctype html><html><head><meta charset="UTF-8"></head><body>${tableHtml}</body></html>`;
+        const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+        const link = document.createElement('a');
+        const scope = teamViewFilterDept || '总览';
+        link.href = URL.createObjectURL(blob);
+        link.download = `团队成员评估-${scope}-${new Date().toISOString().slice(0, 10)}.xls`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+    };
+
     // ... (Handlers) ...
     const handleUnifiedBatchApprove = (items: OKR[]) => {
         openConfirm("确认批量批准?", `即将批准 ${items.length} 位成员的绩效评估进入下一阶段。`, async () => {
@@ -1473,18 +1575,25 @@ export const Assessment: React.FC = () => {
             {/* TAB: TEAM MEMBERS (ICs) */}
             {activeTab === 'TEAM_MEMBERS' && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-left-4">
-                    {(isCrossLevelApprover || user.role === Role.PRESIDENT || teamSubDepts.length > 1) && (
-                        <div className="flex gap-2 overflow-x-auto pb-2 border-b border-slate-100 mb-6 no-scrollbar">
-                            <button onClick={() => setTeamViewFilterDept(null)} className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap border ${!teamViewFilterDept ? 'bg-slate-800 text-white border-slate-800 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>
-                                <LayoutGrid size={12} className="inline mr-1 mb-0.5" /> 总览
-                            </button>
-                            {teamSubDepts.map(dept => (
-                                <button key={dept} onClick={() => setTeamViewFilterDept(dept)} className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap border ${teamViewFilterDept === dept ? 'bg-brand-600 text-white border-brand-600 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>
-                                    {dept}
+                    <div className="flex flex-col gap-3 border-b border-slate-100 pb-3 mb-6 md:flex-row md:items-center md:justify-between">
+                        {(isCrossLevelApprover || user.role === Role.PRESIDENT || teamSubDepts.length > 1) ? (
+                            <div className="flex gap-2 overflow-x-auto no-scrollbar">
+                                <button onClick={() => setTeamViewFilterDept(null)} className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap border ${!teamViewFilterDept ? 'bg-slate-800 text-white border-slate-800 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>
+                                    <LayoutGrid size={12} className="inline mr-1 mb-0.5" /> 总览
                                 </button>
-                            ))}
-                        </div>
-                    )}
+                                {teamSubDepts.map(dept => (
+                                    <button key={dept} onClick={() => setTeamViewFilterDept(dept)} className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap border ${teamViewFilterDept === dept ? 'bg-brand-600 text-white border-brand-600 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>
+                                        {dept}
+                                    </button>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="text-sm font-bold text-slate-700">团队成员评估</div>
+                        )}
+                        <button onClick={handleExportTeamMemberAssessment} className="self-start md:self-auto px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg text-sm font-bold hover:bg-slate-50 hover:border-brand-300 hover:text-brand-700 flex items-center gap-2 transition-colors shadow-sm">
+                            <Download size={16} /> 导出Excel
+                        </button>
+                    </div>
 
                     {/* Unified Action Panel for Members */}
                     {(hasL1ActionScope || hasCrossActionScope || (isTeamPrimaryLead && unifiedActionableItems.length > 0)) && (
