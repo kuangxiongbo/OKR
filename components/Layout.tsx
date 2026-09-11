@@ -214,16 +214,13 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
               <p className="text-sm font-semibold text-slate-800 truncate">{user.name}</p>
               <p className="text-xs text-slate-500 truncate">{ROLE_NAMES[user.role] || user.role}</p>
             </div>
+            <button onClick={() => setIsPasswordModalOpen(true)} className="text-slate-400 hover:text-brand-600 transition-colors" title="修改密码">
+                <Key size={18} />
+            </button>
             <button onClick={handleLogout} className="text-slate-400 hover:text-red-500 transition-colors" title="退出登录">
                 <LogOut size={18} />
             </button>
           </div>
-          <button
-            onClick={() => setIsPasswordModalOpen(true)}
-            className="w-full mb-3 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-600 hover:text-brand-700 hover:border-brand-200 hover:bg-brand-50 text-xs font-bold transition-colors"
-          >
-            <Key size={14} /> 修改密码
-          </button>
           
           {/* Admin Menu: Switch User Functionality - Persistent if Impersonating */}
           {showAdminTools && (
