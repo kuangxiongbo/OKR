@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getGradeConfigs, saveGradeConfigs } from '../services/okrService';
 import { useCurrentUser } from '../hooks/useCurrentUser';
 import { Role, GradeConfiguration } from '../types';
-import { Save, Award, Plus, Trash2 } from 'lucide-react';
+import { Save, Award, Plus, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
 
 const getGradeStyle = (grade: string) => {
     if (grade === 'S') return 'bg-yellow-50 text-yellow-600 border-yellow-200';
@@ -73,6 +73,15 @@ export const GradingSettings: React.FC = () => {
         setGradeConfigs(gradeConfigs.filter((_, idx) => idx !== index));
     };
 
+    const handleMoveGradeConfig = (index: number, direction: -1 | 1) => {
+        const targetIndex = index + direction;
+        if (targetIndex < 0 || targetIndex >= gradeConfigs.length) return;
+        const newConfigs = [...gradeConfigs];
+        const [moved] = newConfigs.splice(index, 1);
+        newConfigs.splice(targetIndex, 0, moved);
+        setGradeConfigs(newConfigs);
+    };
+
     const handleSaveGradeConfig = async () => {
         const gradeNames = gradeConfigs.map(cfg => String(cfg.grade || '').trim()).filter(Boolean);
         if (gradeNames.length !== gradeConfigs.length) {
@@ -95,7 +104,7 @@ export const GradingSettings: React.FC = () => {
 
         try {
             // 等待保存完成，确保数据已保存到服务器
-            await saveGradeConfigs(gradeConfigs.map(cfg => ({ ...cfg, grade: String(cfg.grade).trim() })));
+            await saveGradeConfigs(gradeConfigs.map((cfg, index) => ({ ...cfg, grade: String(cfg.grade).trim(), sortOrder: index })));
             alert("绩效等级配置已保存");
         } catch (error: any) {
             alert(error?.message ? `保存失败：${error.message}` : '保存失败，请检查网络/服务端日志');
@@ -136,7 +145,7 @@ export const GradingSettings: React.FC = () => {
                             <th className="p-4">分数范围 (Min-Max)</th>
                             <th className="p-4 w-[200px]">目标比例 (%)</th>
                             <th className="p-4">描述说明</th>
-                            <th className="p-4 w-[88px] text-center">操作</th>
+                            <th className="p-4 w-[132px] text-center">操作</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -193,6 +202,23 @@ export const GradingSettings: React.FC = () => {
                                     />
                                 </td>
                                 <td className="p-4 text-center">
+                                    <div className="inline-flex items-center justify-center gap-1">
+                                    <button
+                                        onClick={() => handleMoveGradeConfig(idx, -1)}
+                                        disabled={idx === 0}
+                                        className={`inline-flex items-center justify-center w-8 h-8 rounded-lg border border-transparent ${idx === 0 ? 'text-slate-300 cursor-not-allowed' : 'text-slate-500 hover:text-brand-600 hover:bg-brand-50 hover:border-brand-100'}`}
+                                        title="上移"
+                                    >
+                                        <ArrowUp size={16} />
+                                    </button>
+                                    <button
+                                        onClick={() => handleMoveGradeConfig(idx, 1)}
+                                        disabled={idx === gradeConfigs.length - 1}
+                                        className={`inline-flex items-center justify-center w-8 h-8 rounded-lg border border-transparent ${idx === gradeConfigs.length - 1 ? 'text-slate-300 cursor-not-allowed' : 'text-slate-500 hover:text-brand-600 hover:bg-brand-50 hover:border-brand-100'}`}
+                                        title="下移"
+                                    >
+                                        <ArrowDown size={16} />
+                                    </button>
                                     <button
                                         onClick={() => handleDeleteGradeConfig(idx)}
                                         className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-red-500 hover:bg-red-50 border border-transparent hover:border-red-100"
@@ -200,6 +226,7 @@ export const GradingSettings: React.FC = () => {
                                     >
                                         <Trash2 size={16} />
                                     </button>
+                                    </div>
                                 </td>
                             </tr>
                         ))}

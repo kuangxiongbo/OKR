@@ -121,21 +121,23 @@ export async function seed() {
       { grade: 'C', minScore: 0, maxScore: 59, quota: 10, description: '待改进，不符合预期' }
     ];
     
-    for (const config of DEFAULT_GRADE_CONFIGS) {
+    for (const [index, config] of DEFAULT_GRADE_CONFIGS.entries()) {
       await client.query(
-        `INSERT INTO grade_configs (grade, min_score, max_score, quota, description)
-         VALUES ($1, $2, $3, $4, $5)
+        `INSERT INTO grade_configs (grade, min_score, max_score, quota, description, sort_order)
+         VALUES ($1, $2, $3, $4, $5, $6)
          ON CONFLICT (grade) DO UPDATE SET
            min_score = EXCLUDED.min_score,
            max_score = EXCLUDED.max_score,
            quota = EXCLUDED.quota,
-           description = EXCLUDED.description`,
+           description = EXCLUDED.description,
+           sort_order = EXCLUDED.sort_order`,
         [
           config.grade,
           config.minScore,
           config.maxScore,
           config.quota,
-          config.description || ''
+          config.description || '',
+          index
         ]
       );
     }

@@ -3,7 +3,7 @@ import { GradeConfiguration } from '../types';
 
 export class GradeConfigModel {
   static async findAll(): Promise<GradeConfiguration[]> {
-    const result = await query('SELECT * FROM grade_configs ORDER BY max_score DESC, min_score DESC, grade ASC');
+    const result = await query('SELECT * FROM grade_configs ORDER BY sort_order ASC, max_score DESC, min_score DESC, grade ASC');
     return result.rows.map(this.mapRowToConfig);
   }
 
@@ -13,22 +13,23 @@ export class GradeConfigModel {
       await client.query('DELETE FROM grade_configs');
       
       // 插入新配置
-      for (const config of configs) {
+      for (const [index, config] of configs.entries()) {
         await client.query(
-          `INSERT INTO grade_configs (grade, min_score, max_score, quota, description)
-           VALUES ($1, $2, $3, $4, $5)`,
+          `INSERT INTO grade_configs (grade, min_score, max_score, quota, description, sort_order)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
           [
             String(config.grade).trim(),
             config.minScore,
             config.maxScore,
             config.quota,
-            config.description || ''
+            config.description || '',
+            config.sortOrder ?? index
           ]
         );
       }
       
       // 重新查询返回
-      const result = await client.query('SELECT * FROM grade_configs ORDER BY max_score DESC, min_score DESC, grade ASC');
+      const result = await client.query('SELECT * FROM grade_configs ORDER BY sort_order ASC, max_score DESC, min_score DESC, grade ASC');
       return result.rows.map(this.mapRowToConfig);
     });
   }
@@ -39,7 +40,8 @@ export class GradeConfigModel {
       minScore: parseFloat(row.min_score),
       maxScore: parseFloat(row.max_score),
       quota: row.quota,
-      description: row.description || ''
+      description: row.description || '',
+      sortOrder: row.sort_order
     };
   }
 }

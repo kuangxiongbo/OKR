@@ -118,6 +118,7 @@ export interface GradeConfiguration {
   maxScore: number; // Inclusive
   description?: string;
   quota: number; // Percentage (0-100)
+  sortOrder?: number;
 }
 
 export interface User {

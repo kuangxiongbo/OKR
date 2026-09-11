@@ -232,9 +232,24 @@ export async function migrate() {
         max_score DECIMAL(5,2) NOT NULL CHECK (max_score >= min_score),
         quota INTEGER NOT NULL CHECK (quota >= 0 AND quota <= 100),
         description VARCHAR(200),
+        sort_order INTEGER NOT NULL DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+    `);
+    await client.query(`ALTER TABLE grade_configs ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0;`);
+    await client.query(`
+      WITH ranked AS (
+        SELECT id, ROW_NUMBER() OVER (ORDER BY max_score DESC, min_score DESC, grade ASC) - 1 AS row_order
+        FROM grade_configs
+      )
+      UPDATE grade_configs
+      SET sort_order = ranked.row_order
+      FROM ranked
+      WHERE grade_configs.id = ranked.id
+        AND grade_configs.sort_order = 0
+        AND (SELECT COUNT(*) FROM grade_configs) > 1
+        AND (SELECT COUNT(DISTINCT sort_order) FROM grade_configs) = 1;
     `);
     await client.query(`ALTER TABLE grade_configs DROP CONSTRAINT IF EXISTS grade_configs_grade_check;`);
     console.log('✅ 绩效等级配置表创建完成');

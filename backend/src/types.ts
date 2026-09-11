@@ -117,6 +117,7 @@ export interface GradeConfiguration {
   maxScore: number; // Inclusive
   description?: string;
   quota: number; // Percentage (0-100)
+  sortOrder?: number;
 }
 
 // 后端 User 接口：包含 password、source(WECHAT)、ssoAttributes 等后端专用字段

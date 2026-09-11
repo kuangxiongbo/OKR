@@ -57,11 +57,54 @@ const escapeExcelHtml = (value: unknown) => String(value ?? '')
     .replace(/'/g, '&#39;');
 
 const formatScore = (score: number | null | undefined) => score === null || score === undefined ? '' : Number(score).toFixed(1);
+const assessmentExportColumns = ['排名', '姓名', '业务线/部门', 'OKR类型', 'OKR标题', '周期', '状态', '定级', '评分', '自评分', '自评', '上级评分', '上级评价', '目标与KR明细'];
 
-const sortByGradeAndScore = (list: OKR[]) => {
+const buildExcelWorkbookXml = (sheets: { name: string; columns: string[]; rows: unknown[][] }[]) => {
+    const worksheets = sheets.map(sheet => {
+        const sheetName = escapeExcelHtml(sheet.name.replace(/[:\\/?*\[\]]/g, '').slice(0, 31) || 'Sheet');
+        const headerRow = `<Row>${sheet.columns.map(col => `<Cell ss:StyleID="Header"><Data ss:Type="String">${escapeExcelHtml(col)}</Data></Cell>`).join('')}</Row>`;
+        const bodyRows = sheet.rows.map(row =>
+            `<Row>${row.map(cell => `<Cell ss:StyleID="Text"><Data ss:Type="String">${escapeExcelHtml(cell)}</Data></Cell>`).join('')}</Row>`
+        ).join('');
+        return `<Worksheet ss:Name="${sheetName}"><Table>${headerRow}${bodyRows}</Table></Worksheet>`;
+    }).join('');
+
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:html="http://www.w3.org/TR/REC-html40">
+ <Styles>
+  <Style ss:ID="Header"><Font ss:Bold="1"/><Interior ss:Color="#E2E8F0" ss:Pattern="Solid"/><Alignment ss:Vertical="Center" ss:WrapText="1"/></Style>
+  <Style ss:ID="Text"><Alignment ss:Vertical="Top" ss:WrapText="1"/></Style>
+ </Styles>
+ ${worksheets}
+</Workbook>`;
+};
+
+const downloadExcelWorkbook = (filename: string, sheets: { name: string; columns: string[]; rows: unknown[][] }[]) => {
+    const blob = new Blob([buildExcelWorkbookXml(sheets)], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+};
+
+const sortByGradeAndScore = (list: OKR[], configs?: GradeConfiguration[]) => {
+    const orderMap = configs && configs.length > 0
+        ? configs.reduce((acc, cfg, index) => {
+            acc[String(cfg.grade)] = index;
+            return acc;
+        }, {} as Record<string, number>)
+        : gradeSortOrder;
     return [...list].sort((a, b) => {
-        const gradeA = gradeSortOrder[a.finalGrade || ''] ?? 99;
-        const gradeB = gradeSortOrder[b.finalGrade || ''] ?? 99;
+        const gradeA = orderMap[a.finalGrade || ''] ?? 99;
+        const gradeB = orderMap[b.finalGrade || ''] ?? 99;
         if (gradeA !== gradeB) return gradeA - gradeB;
 
         const scoreA = getAssessmentScore(a);
@@ -1087,8 +1130,8 @@ export const Assessment: React.FC = () => {
         const targetUser = allUsers.find(u => u.id === o.userId);
         return targetUser && isLeaderUser(targetUser);
     });
-    const leaderTeamOKRs = sortByGradeAndScore(leaderOKRs.filter(o => o.level !== OKRLevel.PERSONAL));
-    const leaderPersonalOKRs = sortByGradeAndScore(leaderOKRs.filter(o => o.level === OKRLevel.PERSONAL));
+    const leaderTeamOKRs = sortByGradeAndScore(leaderOKRs.filter(o => o.level !== OKRLevel.PERSONAL), gradeConfigs);
+    const leaderPersonalOKRs = sortByGradeAndScore(leaderOKRs.filter(o => o.level === OKRLevel.PERSONAL), gradeConfigs);
 
     const memberOKRs = allAccessibleTeamOKRs.filter(o => {
         const targetUser = allUsers.find(u => u.id === o.userId);
@@ -1130,16 +1173,16 @@ export const Assessment: React.FC = () => {
     }, {} as Record<string, OKR[]>);
 
     const displayedMemberOKRs = teamViewFilterDept ? memberOKRs.filter(o => o.department === teamViewFilterDept) : memberOKRs;
-    const directReports = sortByGradeAndScore(displayedMemberOKRs.filter(o => getApproverRoles(o).l1 === user.role));
+    const directReports = sortByGradeAndScore(displayedMemberOKRs.filter(o => getApproverRoles(o).l1 === user.role), gradeConfigs);
     const crossLevelReports = sortByGradeAndScore(displayedMemberOKRs.filter(o => {
         const { l2, l3 } = getApproverRoles(o);
         return l2 === user.role || l3 === user.role;
-    }));
+    }), gradeConfigs);
     const otherTeamMembers = sortByGradeAndScore(displayedMemberOKRs.filter(o => {
         if (isAdmin || user.role === Role.PRESIDENT) return true;
         const { l1, l2, l3 } = getApproverRoles(o);
         return l1 !== user.role && l2 !== user.role && l3 !== user.role;
-    }));
+    }), gradeConfigs);
 
     const actionScopeOKRs = useMemo(() => {
         if (isAdmin) return [];
@@ -1232,8 +1275,29 @@ export const Assessment: React.FC = () => {
     const currentDistStats = aggregateMemberStats(displayedMemberOKRs.filter(o => o.finalGrade && o.finalGrade !== FinalGrade.PENDING));
 
     const getTeamMemberExportRows = () => sortByGradeAndScore(
-        displayedMemberOKRs.filter(o => o.level === OKRLevel.PERSONAL && isSubmittedAssessmentOKR(o))
+        displayedMemberOKRs.filter(o => o.level === OKRLevel.PERSONAL && isSubmittedAssessmentOKR(o)),
+        gradeConfigs
     );
+
+    const buildAssessmentExportRows = (items: OKR[]) => sortByGradeAndScore(items, gradeConfigs).map((okr, index) => {
+        const score = getAssessmentScore(okr);
+        return [
+            index + 1,
+            okr.userName,
+            okr.department || '',
+            getOKRScopeTypeLabel(okr.level),
+            okr.title,
+            okr.period,
+            getAssessmentStatusLabel(okr),
+            okr.finalGrade || FinalGrade.PENDING,
+            formatScore(score),
+            formatScore(okr.overallSelfAssessment?.score),
+            okr.overallSelfAssessment?.comment || '',
+            formatScore(okr.overallManagerAssessment?.score),
+            okr.overallManagerAssessment?.comment || '',
+            formatOKRDetailForExport(okr)
+        ];
+    });
 
     const formatOKRDetailForExport = (okr: OKR) => {
         return okr.objectives.map((obj, objIndex) => {
@@ -1264,43 +1328,24 @@ export const Assessment: React.FC = () => {
             return;
         }
 
-        const columns = ['排名', '姓名', '业务线/部门', 'OKR类型', 'OKR标题', '周期', '状态', '定级', '评分', '自评分', '自评', '上级评分', '上级评价', '目标与KR明细'];
-        const rows = exportRows.map((okr, index) => {
-            const score = getAssessmentScore(okr);
-            return [
-                index + 1,
-                okr.userName,
-                okr.department || '',
-                getOKRScopeTypeLabel(okr.level),
-                okr.title,
-                okr.period,
-                getAssessmentStatusLabel(okr),
-                okr.finalGrade || FinalGrade.PENDING,
-                formatScore(score),
-                formatScore(okr.overallSelfAssessment?.score),
-                okr.overallSelfAssessment?.comment || '',
-                formatScore(okr.overallManagerAssessment?.score),
-                okr.overallManagerAssessment?.comment || '',
-                formatOKRDetailForExport(okr)
-            ];
-        });
-
-        const tableHtml = [
-            '<table border="1">',
-            `<thead><tr>${columns.map(col => `<th>${escapeExcelHtml(col)}</th>`).join('')}</tr></thead>`,
-            `<tbody>${rows.map(row => `<tr>${row.map(cell => `<td style="mso-number-format:'\\@';white-space:pre-wrap;">${escapeExcelHtml(cell)}</td>`).join('')}</tr>`).join('')}</tbody>`,
-            '</table>'
-        ].join('');
-        const html = `<!doctype html><html><head><meta charset="UTF-8"></head><body>${tableHtml}</body></html>`;
-        const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
-        const link = document.createElement('a');
         const scope = teamViewFilterDept || '总览';
-        link.href = URL.createObjectURL(blob);
-        link.download = `团队成员评估-${scope}-${new Date().toISOString().slice(0, 10)}.xls`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(link.href);
+        downloadExcelWorkbook(`团队成员评估-${scope}-${new Date().toISOString().slice(0, 10)}.xls`, [
+            { name: '个人OKR', columns: assessmentExportColumns, rows: buildAssessmentExportRows(exportRows) }
+        ]);
+    };
+
+    const handleExportLeaderAssessment = () => {
+        const teamRows = leaderTeamOKRs.filter(isSubmittedAssessmentOKR);
+        const personalRows = leaderPersonalOKRs.filter(isSubmittedAssessmentOKR);
+        if (teamRows.length === 0 && personalRows.length === 0) {
+            openAlert('暂无可导出数据', '当前没有已提交的干部评估记录可导出。', 'warning');
+            return;
+        }
+
+        downloadExcelWorkbook(`管理干部评估-${new Date().toISOString().slice(0, 10)}.xls`, [
+            { name: '团队OKR', columns: assessmentExportColumns, rows: buildAssessmentExportRows(teamRows) },
+            { name: '个人OKR', columns: assessmentExportColumns, rows: buildAssessmentExportRows(personalRows) }
+        ]);
     };
 
     // ... (Handlers) ...
@@ -1412,16 +1457,21 @@ export const Assessment: React.FC = () => {
         }, "warning");
     };
 
-    const renderTable = (list: OKR[], title: string, subtitle?: string) => {
+    const renderTable = (list: OKR[], title: string, subtitle?: string, headerAction?: React.ReactNode) => {
         if (!list || list.length === 0) return null;
         return (
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-6 animate-in fade-in slide-in-from-bottom-2">
                 <div className="p-4 bg-slate-50 border-b border-slate-200">
-                    <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                        <div className="w-1 h-4 bg-brand-500 rounded-full"></div> {title}
-                        <span className="ml-auto text-xs bg-white border border-slate-200 px-2 py-0.5 rounded-full text-slate-500 font-normal">{list.length} 人</span>
-                    </h3>
-                    {subtitle && <p className="text-xs text-slate-500 mt-1 pl-3">{subtitle}</p>}
+                    <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                            <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                                <div className="w-1 h-4 bg-brand-500 rounded-full"></div> {title}
+                                <span className="text-xs bg-white border border-slate-200 px-2 py-0.5 rounded-full text-slate-500 font-normal">{list.length} 人</span>
+                            </h3>
+                            {subtitle && <p className="text-xs text-slate-500 mt-1 pl-3">{subtitle}</p>}
+                        </div>
+                        {headerAction}
+                    </div>
                 </div>
                 <div className="divide-y divide-slate-100">
                     {list.map(okr => {
@@ -1788,6 +1838,18 @@ export const Assessment: React.FC = () => {
             {/* TAB: TEAM LEADERS (Cadres) */}
             {activeTab === 'TEAM_LEADERS' && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-left-4">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-purple-100 text-purple-600 p-2 rounded-lg"><UserCog size={20} /></div>
+                            <div>
+                                <h3 className="font-bold text-slate-800 text-lg">直属管理者 (干部) 列表</h3>
+                                <p className="text-xs text-slate-500">以下为您管理的一级部门负责人。作为上级，您可对其进行评估或跨级调整。</p>
+                            </div>
+                        </div>
+                        <button onClick={handleExportLeaderAssessment} className="self-start md:self-auto px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg text-sm font-bold hover:bg-slate-50 hover:border-purple-300 hover:text-purple-700 flex items-center gap-2 transition-colors shadow-sm">
+                            <Download size={16} /> 导出Excel
+                        </button>
+                    </div>
                     {(leaderActionScopeOKRs.length > 0 || leaderUnifiedActionableItems.length > 0) && (
                         <div className={`border rounded-xl shadow-sm mb-6 overflow-hidden bg-white border-purple-200`}>
                             <div className="p-4 border-b border-slate-200 flex items-center justify-between gap-3 bg-white">
@@ -1828,16 +1890,17 @@ export const Assessment: React.FC = () => {
                         </div>
                     )}
 
-                    <div className="flex items-center gap-3 mb-4">
-                        <div className="bg-purple-100 text-purple-600 p-2 rounded-lg"><UserCog size={20} /></div>
-                        <div>
-                            <h3 className="font-bold text-slate-800 text-lg">直属管理者 (干部) 列表</h3>
-                            <p className="text-xs text-slate-500">以下为您管理的一级部门负责人。作为上级，您可对其进行评估或跨级调整。</p>
-                        </div>
-                    </div>
                     {leaderOKRs.length === 0 && <div className="p-10 text-center bg-white rounded-xl border border-dashed border-slate-300 text-slate-400 mt-6">暂无干部评估数据。</div>}
-                    {renderTable(leaderTeamOKRs, "管理者团队 OKR", "以下为您管理的干部团队目标。")}
-                    {renderTable(leaderPersonalOKRs, "管理者个人 OKR", "以下为您管理的干部个人目标。")}
+                    {renderTable(leaderTeamOKRs, "管理者团队 OKR", "以下为您管理的干部团队目标。", (
+                        <button onClick={handleExportLeaderAssessment} className="shrink-0 px-3 py-1.5 bg-white border border-slate-200 text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-50 hover:border-purple-300 hover:text-purple-700 flex items-center gap-1.5 transition-colors shadow-sm">
+                            <Download size={14} /> 导出Excel
+                        </button>
+                    ))}
+                    {renderTable(leaderPersonalOKRs, "管理者个人 OKR", "以下为您管理的干部个人目标。", (
+                        <button onClick={handleExportLeaderAssessment} className="shrink-0 px-3 py-1.5 bg-white border border-slate-200 text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-50 hover:border-purple-300 hover:text-purple-700 flex items-center gap-1.5 transition-colors shadow-sm">
+                            <Download size={14} /> 导出Excel
+                        </button>
+                    ))}
                 </div>
             )}
 
