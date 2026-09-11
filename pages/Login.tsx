@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { login } from '../services/okrService';
+import { changePassword, login } from '../services/okrService';
 import { authAPI } from '../services/api';
 import { Lock, User, ArrowRight, Info, CheckCircle2, MessageCircle, Key, Loader2 } from 'lucide-react';
 
@@ -14,6 +14,11 @@ export const Login: React.FC = () => {
     const [wechatEnabled, setWechatEnabled] = useState(false);
     const [ssoEnabled, setSsoEnabled] = useState(false);
     const [ssoProvider, setSsoProvider] = useState<string | null>(null);
+    const [mustChangePassword, setMustChangePassword] = useState(false);
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmNewPassword, setConfirmNewPassword] = useState('');
+    const [changingPassword, setChangingPassword] = useState(false);
+    const [passwordError, setPasswordError] = useState('');
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -25,6 +30,10 @@ export const Login: React.FC = () => {
             setLoading(false);
             
             if (result.success) {
+                if (result.mustChangePassword) {
+                    setMustChangePassword(true);
+                    return;
+                }
                 navigate('/');
             } else {
                 setError(result.message || '登录失败');
@@ -32,6 +41,39 @@ export const Login: React.FC = () => {
         } catch (error: any) {
             setLoading(false);
             setError(error.message || '登录失败');
+        }
+    };
+
+    const handleChangeInitialPassword = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setPasswordError('');
+
+        if (!newPassword || !confirmNewPassword) {
+            setPasswordError('请输入新密码并确认');
+            return;
+        }
+        if (newPassword !== confirmNewPassword) {
+            setPasswordError('两次输入的新密码不一致');
+            return;
+        }
+        if (newPassword === 'Gw1admin.') {
+            setPasswordError('新密码不能继续使用初始默认密码');
+            return;
+        }
+        if (newPassword.length < 6) {
+            setPasswordError('新密码长度不能少于 6 位');
+            return;
+        }
+
+        setChangingPassword(true);
+        try {
+            await changePassword(password, newPassword);
+            setChangingPassword(false);
+            setMustChangePassword(false);
+            navigate('/');
+        } catch (error: any) {
+            setChangingPassword(false);
+            setPasswordError(error.message || '修改密码失败');
         }
     };
 
@@ -249,6 +291,55 @@ export const Login: React.FC = () => {
             <div className="absolute bottom-4 text-center w-full text-xs text-slate-400">
                 &copy; {new Date().getFullYear()} AlignFlow Enterprise. All rights reserved.
             </div>
+
+            {mustChangePassword && (
+                <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-6">
+                    <form onSubmit={handleChangeInitialPassword} className="w-full max-w-md bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="p-6 border-b border-slate-100">
+                            <div className="w-10 h-10 bg-orange-100 text-orange-600 rounded-lg flex items-center justify-center mb-4">
+                                <Key size={22} />
+                            </div>
+                            <h3 className="text-lg font-bold text-slate-900">修改初始密码</h3>
+                            <p className="text-sm text-slate-500 mt-1">当前账号仍在使用初始默认密码，必须修改后才能进入系统。</p>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            {passwordError && (
+                                <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm flex items-center gap-2 border border-red-100">
+                                    <Info size={16} /> {passwordError}
+                                </div>
+                            )}
+                            <div>
+                                <label className="block text-xs font-bold text-slate-600 uppercase mb-1">新密码</label>
+                                <input
+                                    type="password"
+                                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-brand-500 outline-none text-sm"
+                                    value={newPassword}
+                                    onChange={e => setNewPassword(e.target.value)}
+                                    autoFocus
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-600 uppercase mb-1">确认新密码</label>
+                                <input
+                                    type="password"
+                                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-brand-500 outline-none text-sm"
+                                    value={confirmNewPassword}
+                                    onChange={e => setConfirmNewPassword(e.target.value)}
+                                />
+                            </div>
+                        </div>
+                        <div className="px-6 py-4 bg-slate-50 border-t border-slate-100">
+                            <button
+                                type="submit"
+                                disabled={changingPassword}
+                                className="w-full bg-brand-600 text-white font-bold py-3 rounded-lg hover:bg-brand-700 disabled:opacity-70 disabled:cursor-not-allowed"
+                            >
+                                {changingPassword ? '保存中...' : '保存并进入系统'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            )}
         </div>
     );
 };

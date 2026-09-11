@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
+import { randomUUID } from 'crypto';
 import { UserModel } from '../models/User';
 import { AppError, ErrorCode, createSuccessResponse } from '../utils/errors';
 import { OperationLogModel } from '../models/OperationLog';
@@ -11,6 +12,7 @@ import { WeComConfig, SSOConfig } from '../types';
 const JWT_SECRET: string = process.env.JWT_SECRET || 'okr-system-secret-key-2024';
 const JWT_EXPIRES_IN: string = process.env.JWT_EXPIRES_IN || '7d';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+const DEFAULT_INITIAL_PASSWORD = 'Gw1admin.';
 
 /**
  * 从数据库动态获取企业微信配置并创建服务实例
@@ -115,7 +117,7 @@ export const login = async (req: Request, res: Response) => {
 
     // 记录登录日志
     await OperationLogModel.create({
-      id: `log-${Date.now()}`,
+      id: randomUUID(),
       userId: user.id,
       userName: user.name,
       action: 'LOGIN',
@@ -130,7 +132,8 @@ export const login = async (req: Request, res: Response) => {
 
     res.json(createSuccessResponse({
       token,
-      user: userWithoutPassword
+      user: userWithoutPassword,
+      mustChangePassword: password === DEFAULT_INITIAL_PASSWORD
     }));
   } catch (error) {
     if (error instanceof AppError) {
@@ -162,6 +165,61 @@ export const getCurrentUser = async (req: Request, res: Response) => {
       throw error;
     }
     console.error('Get current user error:', error);
+    throw new AppError(ErrorCode.INTERNAL_ERROR, '服务器错误', 500);
+  }
+};
+
+export const changePassword = async (req: Request, res: Response) => {
+  try {
+    const userId = req.userId;
+    const { oldPassword, newPassword } = req.body;
+
+    if (!userId) {
+      throw new AppError(ErrorCode.UNAUTHORIZED, '未认证', 401);
+    }
+    if (!oldPassword || !newPassword) {
+      throw new AppError(ErrorCode.VALIDATION_ERROR, '原密码和新密码不能为空', 400);
+    }
+    if (newPassword === DEFAULT_INITIAL_PASSWORD) {
+      throw new AppError(ErrorCode.VALIDATION_ERROR, '新密码不能继续使用初始默认密码', 400);
+    }
+    if (String(newPassword).length < 6) {
+      throw new AppError(ErrorCode.VALIDATION_ERROR, '新密码长度不能少于 6 位', 400);
+    }
+
+    const user = await UserModel.findByIdWithPassword(userId);
+    if (!user || !user.password) {
+      throw new AppError(ErrorCode.USER_NOT_FOUND, '用户不存在', 404);
+    }
+
+    const isValid = await UserModel.verifyPassword(oldPassword, user.password);
+    if (!isValid) {
+      throw new AppError(ErrorCode.INVALID_CREDENTIALS, '原密码错误', 401);
+    }
+
+    await UserModel.update(userId, { password: newPassword });
+
+    try {
+      await OperationLogModel.create({
+        id: randomUUID(),
+        userId,
+        userName: user.name,
+        action: 'CHANGE_PASSWORD',
+        module: 'AUTH',
+        details: `用户修改密码: ${user.name}`,
+        ip: req.ip || req.socket.remoteAddress || '',
+        timestamp: new Date().toISOString()
+      });
+    } catch (logError) {
+      console.warn('Change password log skipped:', logError);
+    }
+
+    res.json(createSuccessResponse());
+  } catch (error) {
+    if (error instanceof AppError) {
+      throw error;
+    }
+    console.error('Change password error:', error);
     throw new AppError(ErrorCode.INTERNAL_ERROR, '服务器错误', 500);
   }
 };

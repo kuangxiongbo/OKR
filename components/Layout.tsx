@@ -1,9 +1,9 @@
 
 import React, { useEffect, useState } from 'react';
-import { getUsers, logout, getImpersonator, switchPerspective, getBadgeCounts } from '../services/okrService';
+import { changePassword, getUsers, logout, getImpersonator, switchPerspective, getBadgeCounts } from '../services/okrService';
 import { useCurrentUser } from '../hooks/useCurrentUser';
 import { User, Role, ROLE_NAMES } from '../types';
-import { LayoutDashboard, Target, CheckCircle2, FileText, UserCircle, LogOut, Settings, Award, Users, ShieldAlert, History, Eye } from 'lucide-react';
+import { LayoutDashboard, Target, CheckCircle2, FileText, UserCircle, LogOut, Settings, Award, Users, ShieldAlert, History, Eye, Key, X } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 const NavItem = ({ to, icon: Icon, label, active, count }: any) => (
@@ -29,6 +29,13 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   const user = useCurrentUser();
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [impersonator, setImpersonator] = useState<User | null>(null);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [isPasswordChangeRequired, setIsPasswordChangeRequired] = useState(false);
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
   
   // Notification Counts
   const [counts, setCounts] = useState({ approvals: 0, assessments: 0 });
@@ -47,6 +54,9 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   // Update impersonator status whenever the current user changes (e.g., after a switch)
   useEffect(() => {
      setImpersonator(getImpersonator());
+     const required = localStorage.getItem('alignflow_must_change_password') === 'true';
+     setIsPasswordChangeRequired(required);
+     if (required) setIsPasswordModalOpen(true);
   }, [user]);
 
   // Calculate Badges (Run on mount and data change event)
@@ -73,6 +83,51 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   const handleLogout = () => {
       logout();
       navigate('/login');
+  };
+
+  const closePasswordModal = () => {
+      if (isPasswordChangeRequired) return;
+      setIsPasswordModalOpen(false);
+      setOldPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setPasswordError('');
+      setChangingPassword(false);
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setPasswordError('');
+      if (!oldPassword || !newPassword || !confirmPassword) {
+          setPasswordError('请完整填写原密码、新密码和确认密码');
+          return;
+      }
+      if (newPassword !== confirmPassword) {
+          setPasswordError('两次输入的新密码不一致');
+          return;
+      }
+      if (newPassword === 'Gw1admin.') {
+          setPasswordError('新密码不能继续使用初始默认密码');
+          return;
+      }
+      if (newPassword.length < 6) {
+          setPasswordError('新密码长度不能少于 6 位');
+          return;
+      }
+      setChangingPassword(true);
+      try {
+          await changePassword(oldPassword, newPassword);
+          setIsPasswordChangeRequired(false);
+          setIsPasswordModalOpen(false);
+          setOldPassword('');
+          setNewPassword('');
+          setConfirmPassword('');
+          setPasswordError('');
+          setChangingPassword(false);
+      } catch (error: any) {
+          setChangingPassword(false);
+          setPasswordError(error.message || '修改密码失败');
+      }
   };
 
   if (!user) return null;
@@ -163,6 +218,12 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                 <LogOut size={18} />
             </button>
           </div>
+          <button
+            onClick={() => setIsPasswordModalOpen(true)}
+            className="w-full mb-3 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-600 hover:text-brand-700 hover:border-brand-200 hover:bg-brand-50 text-xs font-bold transition-colors"
+          >
+            <Key size={14} /> 修改密码
+          </button>
           
           {/* Admin Menu: Switch User Functionality - Persistent if Impersonating */}
           {showAdminTools && (
@@ -215,6 +276,49 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             </div>
         </div>
       </main>
+
+      {isPasswordModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-6">
+          <form onSubmit={handleChangePassword} className="w-full max-w-md bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center">
+                  <Key size={18} />
+                </div>
+                <h3 className="font-bold text-slate-900">修改密码</h3>
+              </div>
+              {isPasswordChangeRequired ? (
+                <button type="button" onClick={handleLogout} className="text-xs text-red-500 hover:bg-red-50 px-2 py-1 rounded">退出登录</button>
+              ) : (
+                <button type="button" onClick={closePasswordModal} className="text-slate-400 hover:text-slate-600">
+                  <X size={18} />
+                </button>
+              )}
+            </div>
+            <div className="p-5 space-y-4">
+              {isPasswordChangeRequired && <div className="bg-orange-50 text-orange-700 p-3 rounded-lg text-sm border border-orange-100">当前账号仍在使用初始默认密码，必须修改后才能继续使用系统。</div>}
+              {passwordError && <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm border border-red-100">{passwordError}</div>}
+              <div>
+                <label className="block text-xs font-bold text-slate-600 uppercase mb-1">原密码</label>
+                <input type="password" className="w-full p-3 border border-slate-200 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-brand-500 outline-none text-sm" value={oldPassword} onChange={e => setOldPassword(e.target.value)} />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-600 uppercase mb-1">新密码</label>
+                <input type="password" className="w-full p-3 border border-slate-200 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-brand-500 outline-none text-sm" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-600 uppercase mb-1">确认新密码</label>
+                <input type="password" className="w-full p-3 border border-slate-200 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-brand-500 outline-none text-sm" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} />
+              </div>
+            </div>
+            <div className="px-5 py-4 bg-slate-50 border-t border-slate-100">
+              <button type="submit" disabled={changingPassword} className="w-full bg-brand-600 text-white font-bold py-2.5 rounded-lg hover:bg-brand-700 disabled:opacity-70 disabled:cursor-not-allowed">
+                {changingPassword ? '保存中...' : '保存密码'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 };

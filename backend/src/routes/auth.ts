@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { login, getCurrentUser, wechatAuthorize, wechatCallback, ssoAuthorize, ssoCallback, getLoginConfig } from '../controllers/authController';
+import { login, getCurrentUser, changePassword, wechatAuthorize, wechatCallback, ssoAuthorize, ssoCallback, getLoginConfig } from '../controllers/authController';
 import { authenticate } from '../middleware/auth';
 
 const router = Router();
@@ -10,6 +10,7 @@ router.get('/config', getLoginConfig);
 // 传统账号密码登录
 router.post('/login', login);
 router.get('/me', authenticate, getCurrentUser);
+router.patch('/password', authenticate, changePassword);
 
 // 企业微信登录
 router.get('/wechat/authorize', wechatAuthorize);

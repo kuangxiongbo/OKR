@@ -71,7 +71,7 @@ export const authAPI = {
   },
 
   login: async (account: string, password: string) => {
-    const data = await request<{ success: boolean; data?: { token?: string; user?: any }; error?: { message?: string } }>(
+    const data = await request<{ success: boolean; data?: { token?: string; user?: any; mustChangePassword?: boolean }; error?: { message?: string } }>(
       '/v1/auth/login',
       {
         method: 'POST',
@@ -83,6 +83,13 @@ export const authAPI = {
       localStorage.setItem('alignflow_current_user_id', data.data.user?.id || '');
     }
     return data;
+  },
+
+  changePassword: async (oldPassword: string, newPassword: string) => {
+    return request<{ success: boolean; error?: { message?: string } }>('/v1/auth/password', {
+      method: 'PATCH',
+      body: JSON.stringify({ oldPassword, newPassword }),
+    });
   },
   
   getCurrentUser: async () => {

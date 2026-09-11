@@ -235,7 +235,6 @@ export const UserManagement: React.FC = () => {
             id: editUser.id || `u-${Date.now()}`,
             name: editUser.name,
             account: editUser.account,
-            password: editUser.password || (editUser.id ? users.find(u => u.id === editUser.id)?.password : '123456'),
             role: editUser.role || Role.RD_EMPLOYEE,
             department: editUser.department || '', 
             avatar: editUser.avatar || `https://ui-avatars.com/api/?name=${editUser.name}&background=random`,
@@ -243,6 +242,9 @@ export const UserManagement: React.FC = () => {
             ssoConnected: editUser.ssoConnected || false,
             isPrimaryApprover: editUser.isPrimaryApprover || false,
         };
+        if (!editUser.id || showPasswordReset) {
+            newUser.password = editUser.password;
+        }
 
         try {
             if (newUser.isPrimaryApprover && newUser.department) {
@@ -686,6 +688,13 @@ export const UserManagement: React.FC = () => {
                                                     title="编辑"
                                                 >
                                                     <Edit2 size={16} />
+                                                </button>
+                                                <button 
+                                                    onClick={() => { setIsEditing(true); setEditUser({ ...u, password: '' }); setShowPasswordReset(true); setConfirmPassword(''); }}
+                                                    className="text-amber-600 hover:bg-amber-50 p-1.5 rounded transition-colors"
+                                                    title="修改密码"
+                                                >
+                                                    <Key size={16} />
                                                 </button>
                                                 <button 
                                                     onClick={() => handleDelete(u.id)}

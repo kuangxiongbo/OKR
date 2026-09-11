@@ -403,6 +403,7 @@ export const clearInvalidAuthSession = () => {
     removeToken();
     localStorage.removeItem(STORAGE_KEYS.CURRENT_USER_ID);
     localStorage.removeItem(STORAGE_KEYS.IMPERSONATOR_ID);
+    localStorage.removeItem('alignflow_must_change_password');
     notifyUserSubscribers();
 };
 
@@ -601,7 +602,12 @@ export const login = async (account: string, pass: string) => {
             // 通知订阅者（触发 useCurrentUser hook 更新）
             notifyUserSubscribers();
             addLog('LOGIN', 'AUTH', `用户登录: ${user.name}`);
-            return { success: true };
+            if (result.data.mustChangePassword) {
+                localStorage.setItem('alignflow_must_change_password', 'true');
+            } else {
+                localStorage.removeItem('alignflow_must_change_password');
+            }
+            return { success: true, mustChangePassword: !!result.data.mustChangePassword };
         }
         return { success: false, message: result.error?.message || '账号或密码错误' };
     } catch (error: any) {
@@ -610,12 +616,22 @@ export const login = async (account: string, pass: string) => {
     }
 };
 
+export const changePassword = async (oldPassword: string, newPassword: string) => {
+    const result = await authAPI.changePassword(oldPassword, newPassword);
+    if (!result.success) {
+        throw new Error(result.error?.message || '修改密码失败');
+    }
+    localStorage.removeItem('alignflow_must_change_password');
+    return result;
+};
+
 export const logout = () => {
     const u = getCurrentUser();
     if (u) addLog('LOGOUT', 'AUTH', `用户登出: ${u.name}`);
     removeToken();
     localStorage.removeItem(STORAGE_KEYS.CURRENT_USER_ID);
     localStorage.removeItem(STORAGE_KEYS.IMPERSONATOR_ID);
+    localStorage.removeItem('alignflow_must_change_password');
     notifyUserSubscribers();
 };
 
