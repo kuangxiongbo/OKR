@@ -14,6 +14,32 @@ const getRoleLabel = (roleKey: string | Role, options: { value: string, label: s
     return found ? found.label : (ROLE_NAMES[roleKey as string] || roleKey);
 };
 
+const gradeSortOrder: Record<string, number> = {
+    [FinalGrade.S]: 0,
+    [FinalGrade.A]: 1,
+    [FinalGrade.B]: 2,
+    [FinalGrade.C]: 3,
+    [FinalGrade.PENDING]: 4
+};
+
+const getAssessmentScore = (okr: OKR) => okr.totalScore ?? okr.overallManagerAssessment?.score ?? null;
+
+const sortByGradeAndScore = (list: OKR[]) => {
+    return [...list].sort((a, b) => {
+        const gradeA = gradeSortOrder[a.finalGrade || ''] ?? 99;
+        const gradeB = gradeSortOrder[b.finalGrade || ''] ?? 99;
+        if (gradeA !== gradeB) return gradeA - gradeB;
+
+        const scoreA = getAssessmentScore(a);
+        const scoreB = getAssessmentScore(b);
+        if (scoreA !== null && scoreB !== null && scoreA !== scoreB) return scoreB - scoreA;
+        if (scoreA !== null && scoreB === null) return -1;
+        if (scoreA === null && scoreB !== null) return 1;
+
+        return (a.userName || '').localeCompare(b.userName || '', 'zh-Hans-CN');
+    });
+};
+
 // ... (ListItem Component - No changes) ...
 const ListItem: React.FC<{
     okr: OKR,
@@ -1073,16 +1099,16 @@ export const Assessment: React.FC = () => {
     }, {} as Record<string, OKR[]>);
 
     const displayedMemberOKRs = teamViewFilterDept ? memberOKRs.filter(o => o.department === teamViewFilterDept) : memberOKRs;
-    const directReports = displayedMemberOKRs.filter(o => getApproverRoles(o).l1 === user.role);
-    const crossLevelReports = displayedMemberOKRs.filter(o => {
+    const directReports = sortByGradeAndScore(displayedMemberOKRs.filter(o => getApproverRoles(o).l1 === user.role));
+    const crossLevelReports = sortByGradeAndScore(displayedMemberOKRs.filter(o => {
         const { l2, l3 } = getApproverRoles(o);
         return l2 === user.role || l3 === user.role;
-    });
-    const otherTeamMembers = displayedMemberOKRs.filter(o => {
+    }));
+    const otherTeamMembers = sortByGradeAndScore(displayedMemberOKRs.filter(o => {
         if (isAdmin || user.role === Role.PRESIDENT) return true;
         const { l1, l2, l3 } = getApproverRoles(o);
         return l1 !== user.role && l2 !== user.role && l3 !== user.role;
-    });
+    }));
 
     const actionScopeOKRs = useMemo(() => {
         if (isAdmin) return [];
