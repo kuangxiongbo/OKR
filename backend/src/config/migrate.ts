@@ -79,7 +79,7 @@ export async function migrate() {
         -- display_order：我的 OKR 卡片优先级（从上到下，数字越小越靠前）
         display_order INTEGER NOT NULL DEFAULT 0,
         total_score DECIMAL(5,2) CHECK (total_score >= 0 AND total_score <= 120),
-        final_grade VARCHAR(10) CHECK (final_grade IN ('S', 'A', 'B', 'C', '待定')),
+        final_grade VARCHAR(10),
         adjustment_reason TEXT,
         is_performance_archived BOOLEAN DEFAULT FALSE,
         objectives JSONB NOT NULL,
@@ -179,6 +179,7 @@ export async function migrate() {
       }
     }
     console.log('✅ OKR 表创建完成');
+    await client.query(`ALTER TABLE okrs DROP CONSTRAINT IF EXISTS okrs_final_grade_check;`);
     
     // 3. 创建 OKR 变更历史表
     await client.query(`
@@ -226,7 +227,7 @@ export async function migrate() {
     await client.query(`
       CREATE TABLE IF NOT EXISTS grade_configs (
         id SERIAL PRIMARY KEY,
-        grade VARCHAR(10) UNIQUE NOT NULL CHECK (grade IN ('S', 'A', 'B', 'C')),
+        grade VARCHAR(10) UNIQUE NOT NULL,
         min_score DECIMAL(5,2) NOT NULL CHECK (min_score >= 0),
         max_score DECIMAL(5,2) NOT NULL CHECK (max_score >= min_score),
         quota INTEGER NOT NULL CHECK (quota >= 0 AND quota <= 100),
@@ -235,6 +236,7 @@ export async function migrate() {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
+    await client.query(`ALTER TABLE grade_configs DROP CONSTRAINT IF EXISTS grade_configs_grade_check;`);
     console.log('✅ 绩效等级配置表创建完成');
     
     // 6. 创建部门表

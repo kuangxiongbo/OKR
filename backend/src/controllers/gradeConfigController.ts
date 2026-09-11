@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { randomUUID } from 'crypto';
 import { GradeConfigModel } from '../models/GradeConfig';
 import { AppError, ErrorCode, createSuccessResponse } from '../utils/errors';
 import { OperationLogModel } from '../models/OperationLog';
@@ -24,6 +25,17 @@ export const saveAllGradeConfigs = async (req: Request, res: Response) => {
       throw new AppError(ErrorCode.VALIDATION_ERROR, '配置必须是数组', 400);
     }
 
+    const gradeNames = configs.map(config => String(config.grade || '').trim()).filter(Boolean);
+    if (gradeNames.length !== configs.length) {
+      throw new AppError(ErrorCode.VALIDATION_ERROR, '等级名称不能为空', 400);
+    }
+    if (new Set(gradeNames).size !== gradeNames.length) {
+      throw new AppError(ErrorCode.VALIDATION_ERROR, '等级名称不能重复', 400);
+    }
+    if (configs.some(config => Number(config.minScore) > Number(config.maxScore))) {
+      throw new AppError(ErrorCode.VALIDATION_ERROR, '分数范围不合法，Min 不能大于 Max', 400);
+    }
+
     // 验证配额总和
     const totalQuota = configs.reduce((sum, config) => sum + config.quota, 0);
     if (totalQuota !== 100) {
@@ -35,7 +47,7 @@ export const saveAllGradeConfigs = async (req: Request, res: Response) => {
     // 记录日志
     const user = await (await import('../models/User')).UserModel.findById(userId);
     await OperationLogModel.create({
-      id: `log-${Date.now()}`,
+      id: randomUUID(),
       userId,
       userName: user?.name || 'Unknown',
       action: 'UPDATE_GRADE_CONFIGS',

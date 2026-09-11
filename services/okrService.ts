@@ -1138,10 +1138,11 @@ export const calculateOKRTotalScore = (okr: OKR): number => {
 };
 
 const DEFAULT_GRADE_CONFIGS: GradeConfiguration[] = [
-    { grade: FinalGrade.S, minScore: 100, maxScore: 120, quota: 20, description: '远超预期' },
-    { grade: FinalGrade.A, minScore: 90, maxScore: 99, quota: 60, description: '符合预期' },
-    { grade: FinalGrade.B, minScore: 70, maxScore: 89, quota: 15, description: '需要改进' },
-    { grade: FinalGrade.C, minScore: 0, maxScore: 69, quota: 5, description: '不合格' }
+    { grade: FinalGrade.S, minScore: 95, maxScore: 100, quota: 10, description: '卓越，远超预期，有较大突破，高效完成' },
+    { grade: FinalGrade.A, minScore: 85, maxScore: 94, quota: 20, description: '优秀，部分超预期' },
+    { grade: FinalGrade.B, minScore: 70, maxScore: 84, quota: 50, description: '合格，符合预期' },
+    { grade: FinalGrade.B_MINUS, minScore: 60, maxScore: 69, quota: 10, description: '基本合格，部分待改进' },
+    { grade: FinalGrade.C, minScore: 0, maxScore: 59, quota: 10, description: '待改进，不符合预期' }
 ];
 
 export const getGradeConfigs = (): GradeConfiguration[] => {
@@ -1169,7 +1170,7 @@ export const saveGradeConfigs = async (configs: GradeConfiguration[]) => {
     }
 };
 
-export const determineGrade = (score: number): FinalGrade => {
+export const determineGrade = (score: number): FinalGrade | string => {
     const configs = getGradeConfigs();
     for (const cfg of configs) {
         if (score >= cfg.minScore && score <= cfg.maxScore) {

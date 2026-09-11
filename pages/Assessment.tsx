@@ -18,11 +18,15 @@ const gradeSortOrder: Record<string, number> = {
     [FinalGrade.S]: 0,
     [FinalGrade.A]: 1,
     [FinalGrade.B]: 2,
-    [FinalGrade.C]: 3,
-    [FinalGrade.PENDING]: 4
+    [FinalGrade.B_MINUS]: 3,
+    [FinalGrade.C]: 4,
+    [FinalGrade.PENDING]: 5
 };
 
 const getAssessmentScore = (okr: OKR) => okr.totalScore ?? okr.overallManagerAssessment?.score ?? null;
+const getGradeTextClass = (grade?: string) => grade === 'S' ? 'text-yellow-500' : grade === 'A' ? 'text-green-500' : grade === 'B' || grade === 'B-' ? 'text-blue-500' : 'text-slate-500';
+const getGradeBadgeClass = (grade?: string) => grade === 'S' ? 'bg-yellow-100 text-yellow-700 border border-yellow-200' : grade === 'A' ? 'bg-green-100 text-green-700 border border-green-200' : grade === 'B' || grade === 'B-' ? 'bg-blue-100 text-blue-700 border border-blue-200' : grade === 'C' ? 'bg-slate-100 text-slate-600 border border-slate-300' : 'bg-slate-50 text-slate-400 border border-slate-200';
+const getGradeBarClass = (grade?: string) => grade === 'S' ? 'bg-yellow-400' : grade === 'A' ? 'bg-green-400' : grade === 'B' || grade === 'B-' ? 'bg-blue-400' : 'bg-slate-300';
 
 const sortByGradeAndScore = (list: OKR[]) => {
     return [...list].sort((a, b) => {
@@ -164,6 +168,7 @@ interface AssessmentModalProps {
     allUsers: User[];
     roleOptions: { value: string, label: string }[];
     workflows: ApprovalWorkflow[];
+    gradeConfigs: GradeConfiguration[];
     onAlert: (title: string, msg: React.ReactNode, type?: 'info' | 'success' | 'warning' | 'danger') => void;
     onConfirm: (title: string, msg: React.ReactNode, onConfirm: () => void, type?: 'info' | 'danger' | 'warning' | 'success') => void;
     onRefresh: () => void;
@@ -179,7 +184,7 @@ const getUniqueUsers = (okrs: OKR[], allUsers: User[]): User[] => {
     return Array.from(uniqueMap.values());
 };
 
-const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onChange: setSelectedOKR, onClose, currentUser: user, allUsers, roleOptions, workflows, onAlert, onConfirm, onRefresh }) => {
+const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onChange: setSelectedOKR, onClose, currentUser: user, allUsers, roleOptions, workflows, gradeConfigs, onAlert, onConfirm, onRefresh }) => {
     const isSelf = user.id === selectedOKR.userId;
     const isPeer = selectedOKR.peerReviewers?.includes(user.id) && !isSelf;
     const { l1, l2, l3, cc } = getApproverRoles(selectedOKR);
@@ -367,7 +372,7 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
         }
         updateAndSave(newOKR);
     };
-    const updateFinalGrade = (grade: FinalGrade) => {
+    const updateFinalGrade = (grade: FinalGrade | string) => {
         const newOKR = { ...selectedOKR, finalGrade: grade };
         updateAndSave(newOKR);
     }
@@ -771,15 +776,12 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
                                         </div>
                                         <div className="text-xs text-orange-500 uppercase font-bold mt-4 mb-1">最终定级</div>
                                         {canAdjustGrade ? (
-                                            <select className={`text-4xl font-extrabold text-center bg-transparent outline-none w-full ${selectedOKR.finalGrade === 'S' ? 'text-yellow-500' : selectedOKR.finalGrade === 'A' ? 'text-green-500' : 'text-blue-500'}`} value={selectedOKR.finalGrade || FinalGrade.PENDING} onChange={e => updateFinalGrade(e.target.value as FinalGrade)}>
+                                            <select className={`text-4xl font-extrabold text-center bg-transparent outline-none w-full ${getGradeTextClass(selectedOKR.finalGrade)}`} value={selectedOKR.finalGrade || FinalGrade.PENDING} onChange={e => updateFinalGrade(e.target.value)}>
                                                 <option value={FinalGrade.PENDING}>待定</option>
-                                                <option value={FinalGrade.S}>S</option>
-                                                <option value={FinalGrade.A}>A</option>
-                                                <option value={FinalGrade.B}>B</option>
-                                                <option value={FinalGrade.C}>C</option>
+                                                {gradeConfigs.map(cfg => <option key={cfg.grade} value={cfg.grade}>{cfg.grade}</option>)}
                                             </select>
                                         ) : (
-                                            <div className={`text-4xl font-extrabold flex items-center justify-center ${selectedOKR.finalGrade === 'S' ? 'text-yellow-500' : selectedOKR.finalGrade === 'A' ? 'text-green-500' : 'text-blue-500'}`}>{selectedOKR.finalGrade || FinalGrade.PENDING}</div>
+                                            <div className={`text-4xl font-extrabold flex items-center justify-center ${getGradeTextClass(selectedOKR.finalGrade)}`}>{selectedOKR.finalGrade || FinalGrade.PENDING}</div>
                                         )}
                                     </div>
                                 </div>
@@ -835,12 +837,9 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
                                     <div className="flex justify-between items-center">
                                         <div className="flex items-center gap-2">
                                             <span className="text-xs font-bold text-slate-600">建议评级:</span>
-                                            <select className="text-sm border border-purple-200 rounded p-1 outline-none focus:border-purple-500" value={peerGrade} onChange={e => setPeerGrade(e.target.value as FinalGrade)}>
+                                            <select className="text-sm border border-purple-200 rounded p-1 outline-none focus:border-purple-500" value={peerGrade} onChange={e => setPeerGrade(e.target.value)}>
                                                 <option value="">(不指定)</option>
-                                                <option value={FinalGrade.S}>S</option>
-                                                <option value={FinalGrade.A}>A</option>
-                                                <option value={FinalGrade.B}>B</option>
-                                                <option value={FinalGrade.C}>C</option>
+                                                {gradeConfigs.map(cfg => <option key={cfg.grade} value={cfg.grade}>{cfg.grade}</option>)}
                                             </select>
                                         </div>
                                         <button onClick={() => handleSavePeerReview(peerComment, peerGrade)} className="bg-purple-600 text-white px-4 py-1.5 rounded text-xs font-bold hover:bg-purple-700 flex items-center gap-1"><Send size={12} /> 提交评估</button>
@@ -1344,7 +1343,7 @@ export const Assessment: React.FC = () => {
                         return (
                             <div key={okr.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors group">
                                 <div className="flex items-center gap-3">
-                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm shadow-sm ${okr.finalGrade === 'S' ? 'bg-yellow-100 text-yellow-700 border border-yellow-200' : okr.finalGrade === 'A' ? 'bg-green-100 text-green-700 border border-green-200' : okr.finalGrade === 'B' ? 'bg-blue-100 text-blue-700 border border-blue-200' : okr.finalGrade === 'C' ? 'bg-slate-100 text-slate-600 border border-slate-300' : 'bg-slate-50 text-slate-400 border border-slate-200'}`}>{okr.finalGrade || '-'}</div>
+                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm shadow-sm ${getGradeBadgeClass(okr.finalGrade)}`}>{okr.finalGrade || '-'}</div>
                                     <div>
                                         <div className="flex items-center gap-2 flex-wrap">
                                             <span className="text-sm font-bold text-slate-800">{okr.userName}</span>
@@ -1560,11 +1559,11 @@ export const Assessment: React.FC = () => {
                                 <h3 className="font-bold text-slate-800 flex items-center gap-2"><BarChart3 size={18} /> {teamViewFilterDept ? `${teamViewFilterDept} 等级分布` : '团队整体等级分布'}</h3>
                                 <span className="ml-auto text-xs bg-slate-100 text-slate-600 px-3 py-1 rounded-full font-bold">考核总人数: {totalPoolCount} 人</span>
                             </div>
-                            <div className="grid grid-cols-4 gap-4">
+                            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                                 {currentDistStats.map(stat => (
                                     <div key={stat.grade} className={`p-4 rounded-lg border ${stat.isOver ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-200'}`}>
                                         <div className="flex justify-between items-center mb-2">
-                                            <span className={`text-lg font-bold w-8 h-8 flex items-center justify-center rounded border bg-white ${stat.grade === 'S' ? 'text-yellow-600 border-yellow-200' : stat.grade === 'A' ? 'bg-green-100 text-green-700 border-green-200' : 'text-slate-600 border-slate-200'}`}>{stat.grade}</span>
+                                            <span className={`text-lg font-bold w-8 h-8 flex items-center justify-center rounded border bg-white ${getGradeTextClass(stat.grade)}`}>{stat.grade}</span>
                                             <div className="flex flex-col items-end"><span className="text-xs text-slate-500 font-mono">目标: {stat.targetCount}人</span><span className="text-[10px] text-slate-400">({stat.quota}%)</span></div>
                                         </div>
                                         <div className="text-2xl font-bold text-slate-800 mb-1">{stat.count} <span className="text-sm font-normal text-slate-400">/ {stat.targetCount}</span></div>
@@ -1624,8 +1623,8 @@ export const Assessment: React.FC = () => {
                                         </div>
                                         {isSubmitted ? (
                                             <>
-                                                <div className="flex h-2 w-full rounded-full overflow-hidden mb-3 bg-slate-100">{stats.map(s => (s.count > 0 && <div key={s.grade} className={`${s.grade === 'S' ? 'bg-yellow-400' : s.grade === 'A' ? 'bg-green-400' : s.grade === 'B' ? 'bg-blue-400' : 'bg-slate-300'}`} style={{ width: `${s.percent}%` }}></div>))}</div>
-                                                <div className="grid grid-cols-4 gap-1 text-center mb-4">{stats.map(s => (<div key={s.grade} className="bg-slate-50 rounded p-1"><div className="text-[10px] text-slate-400 font-bold">{s.grade}</div><div className={`text-sm font-bold ${s.isOver ? 'text-red-500' : 'text-slate-700'}`}>{s.count}</div></div>))}</div>
+                                                <div className="flex h-2 w-full rounded-full overflow-hidden mb-3 bg-slate-100">{stats.map(s => (s.count > 0 && <div key={s.grade} className={getGradeBarClass(s.grade)} style={{ width: `${s.percent}%` }}></div>))}</div>
+                                                <div className="grid grid-cols-5 gap-1 text-center mb-4">{stats.map(s => (<div key={s.grade} className="bg-slate-50 rounded p-1"><div className="text-[10px] text-slate-400 font-bold">{s.grade}</div><div className={`text-sm font-bold ${s.isOver ? 'text-red-500' : 'text-slate-700'}`}>{s.count}</div></div>))}</div>
                                             </>
                                         ) : (
                                             <div className="h-16 flex items-center justify-center text-xs text-slate-400 border border-dashed border-slate-200 rounded mb-4 bg-slate-50/50"><div className="flex items-center gap-1"><Lock size={12} /> 等待一级主管提交</div></div>
@@ -1805,6 +1804,7 @@ export const Assessment: React.FC = () => {
                     allUsers={allUsers}
                     roleOptions={roleOptions}
                     workflows={workflows}
+                    gradeConfigs={gradeConfigs}
                     onAlert={openAlert}
                     onConfirm={openConfirm}
                     onRefresh={refreshData}

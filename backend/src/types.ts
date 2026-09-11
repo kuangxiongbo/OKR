@@ -82,6 +82,7 @@ export enum FinalGrade {
   S = 'S',
   A = 'A',
   B = 'B',
+  B_MINUS = 'B-',
   C = 'C',
   PENDING = '待定'
 }
@@ -111,7 +112,7 @@ export interface ApprovalWorkflow {
 }
 
 export interface GradeConfiguration {
-  grade: FinalGrade;
+  grade: FinalGrade | string;
   minScore: number;
   maxScore: number; // Inclusive
   description?: string;
@@ -212,7 +213,7 @@ export interface CCFeedback {
   userName: string;
   role: string;
   comment: string;
-  recommendedGrade?: FinalGrade;
+  recommendedGrade?: FinalGrade | string;
   createdAt: string;
 }
 
@@ -242,7 +243,7 @@ export interface OKR {
   // Manager Overall Assessment
   overallManagerAssessment?: OverallAssessment;
 
-  finalGrade?: FinalGrade;
+  finalGrade?: FinalGrade | string;
   totalScore?: number; // Calculated total score
   createdAt: string;
   managerApprovedAt?: string;

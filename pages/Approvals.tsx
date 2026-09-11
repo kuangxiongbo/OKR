@@ -1,7 +1,7 @@
 
 
 import React, { useEffect, useState } from 'react';
-import { getOKRs, updateOKRStatus, getApproverRoles, getUsers, saveOKR } from '../services/okrService';
+import { getOKRs, updateOKRStatus, getApproverRoles, getUsers, saveOKR, getGradeConfigs } from '../services/okrService';
 import { useCurrentUser } from '../hooks/useCurrentUser';
 import { OKR, OKRStatus, Role, ROLE_NAMES, User, FinalGrade, OKRLevel } from '../types';
 import { getOKRScopeTypeLabel } from '../utils/okrScope';
@@ -553,6 +553,7 @@ const FeedbackCard: React.FC<FeedbackCardProps> = ({ okr, currentUser, onSubmitF
     const existingFeedback = okr.ccFeedback?.find(f => f.userId === currentUser.id);
     const [comment, setComment] = useState(existingFeedback?.comment || '');
     const [grade, setGrade] = useState<string>(existingFeedback?.recommendedGrade || '');
+    const gradeOptions = getGradeConfigs();
 
     useEffect(() => {
         const ef = okr.ccFeedback?.find(f => f.userId === currentUser.id);
@@ -646,10 +647,7 @@ const FeedbackCard: React.FC<FeedbackCardProps> = ({ okr, currentUser, onSubmitF
                                             title="评估阶段可提供参考评级"
                                         >
                                             <option value="">--</option>
-                                            <option value={FinalGrade.S}>S</option>
-                                            <option value={FinalGrade.A}>A</option>
-                                            <option value={FinalGrade.B}>B</option>
-                                            <option value={FinalGrade.C}>C</option>
+                                            {gradeOptions.map(cfg => <option key={cfg.grade} value={cfg.grade}>{cfg.grade}</option>)}
                                         </select>
                                     </>
                                 )}

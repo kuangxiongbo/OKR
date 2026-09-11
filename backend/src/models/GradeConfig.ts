@@ -3,7 +3,7 @@ import { GradeConfiguration } from '../types';
 
 export class GradeConfigModel {
   static async findAll(): Promise<GradeConfiguration[]> {
-    const result = await query('SELECT * FROM grade_configs ORDER BY grade');
+    const result = await query('SELECT * FROM grade_configs ORDER BY max_score DESC, min_score DESC, grade ASC');
     return result.rows.map(this.mapRowToConfig);
   }
 
@@ -18,7 +18,7 @@ export class GradeConfigModel {
           `INSERT INTO grade_configs (grade, min_score, max_score, quota, description)
            VALUES ($1, $2, $3, $4, $5)`,
           [
-            config.grade,
+            String(config.grade).trim(),
             config.minScore,
             config.maxScore,
             config.quota,
@@ -28,7 +28,7 @@ export class GradeConfigModel {
       }
       
       // 重新查询返回
-      const result = await client.query('SELECT * FROM grade_configs ORDER BY grade');
+      const result = await client.query('SELECT * FROM grade_configs ORDER BY max_score DESC, min_score DESC, grade ASC');
       return result.rows.map(this.mapRowToConfig);
     });
   }

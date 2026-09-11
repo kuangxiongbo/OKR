@@ -114,10 +114,11 @@ export async function seed() {
     // 4. 初始化绩效等级配置
     console.log('初始化绩效等级配置数据...');
     const DEFAULT_GRADE_CONFIGS: GradeConfiguration[] = [
-      { grade: 'S' as any, minScore: 90, maxScore: 120, quota: 10, description: '优秀' },
-      { grade: 'A' as any, minScore: 80, maxScore: 89, quota: 20, description: '良好' },
-      { grade: 'B' as any, minScore: 60, maxScore: 79, quota: 50, description: '合格' },
-      { grade: 'C' as any, minScore: 0, maxScore: 59, quota: 20, description: '待改进' }
+      { grade: 'S', minScore: 95, maxScore: 100, quota: 10, description: '卓越，远超预期，有较大突破，高效完成' },
+      { grade: 'A', minScore: 85, maxScore: 94, quota: 20, description: '优秀，部分超预期' },
+      { grade: 'B', minScore: 70, maxScore: 84, quota: 50, description: '合格，符合预期' },
+      { grade: 'B-', minScore: 60, maxScore: 69, quota: 10, description: '基本合格，部分待改进' },
+      { grade: 'C', minScore: 0, maxScore: 59, quota: 10, description: '待改进，不符合预期' }
     ];
     
     for (const config of DEFAULT_GRADE_CONFIGS) {
