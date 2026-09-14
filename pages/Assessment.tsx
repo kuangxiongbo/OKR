@@ -317,6 +317,7 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
     const targetUser = allUsers.find(u => u.id === selectedOKR.userId);
     const isTargetCadre = targetUser ? isCadre(targetUser.role) : false;
     const managerTotalScore = selectedOKR.totalScore ?? selectedOKR.overallManagerAssessment?.score;
+    const isArchivedResult = isSelf && (selectedOKR.isPerformanceArchived || selectedOKR.status === OKRStatus.CLOSED);
 
     // Determine Status Text in Modal
     let modalStatusText = '未知';
@@ -699,7 +700,7 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
                             <span className={`text-xs px-2 py-1 rounded border font-bold ${selectedOKR.level === OKRLevel.PERSONAL ? 'bg-violet-50 text-violet-700 border-violet-100' : 'bg-teal-50 text-teal-800 border-teal-100'}`}>
                                 {getOKRScopeTypeLabel(selectedOKR)}
                             </span>
-                            {selectedOKR.totalScore !== undefined && showManagerColumn && (
+                            {selectedOKR.finalGrade && showManagerColumn && (
                                 <span className="text-sm font-bold text-indigo-600">最终评级: {selectedOKR.finalGrade || '待定'}</span>
                             )}
                             {isPrimaryOverride && (
@@ -754,7 +755,7 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
                         <div key={obj.id} className="border border-slate-200 rounded-lg overflow-hidden mb-6">
                             <div className="bg-slate-100 p-4 border-b border-slate-200 flex justify-between items-center">
                                 <h3 className="font-bold text-slate-800">O{i + 1}: {obj.content} <span className="text-xs font-normal text-slate-500 ml-2">权重 {obj.weight}%</span></h3>
-                                {canEditSelf && <span className="text-xs text-blue-600 font-medium">当前自评: {obj.selfScore || 0}分</span>}
+                                {canEditSelf && !isArchivedResult && <span className="text-xs text-blue-600 font-medium">当前自评: {obj.selfScore || 0}分</span>}
                             </div>
                             <div className="divide-y divide-slate-100 bg-white">
                                 {(obj.keyResults || []).map((kr, k) => (
@@ -762,7 +763,7 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
                                         <div className="bg-slate-50 p-3 rounded border border-slate-200">
                                             <div className="text-sm font-medium text-slate-700 mb-2">KR {k + 1}: {kr.content}</div>
                                             <div className="flex gap-2">
-                                                <input type="number" disabled={!canEditSelf} placeholder="0" className="w-16 p-1.5 border rounded text-sm text-center font-medium text-blue-700" value={kr.selfScore ?? ''} onChange={e => updateKRSelf(i, k, 'selfScore', e.target.value)} />
+                                                {!isArchivedResult && <input type="number" disabled={!canEditSelf} placeholder="0" className="w-16 p-1.5 border rounded text-sm text-center font-medium text-blue-700" value={kr.selfScore ?? ''} onChange={e => updateKRSelf(i, k, 'selfScore', e.target.value)} />}
                                                 <div className="flex-1 text-sm text-slate-600 bg-white p-1.5 rounded border border-slate-200 min-h-[50px] flex items-center">
                                                     {canEditSelf ? (
                                                         <textarea className="w-full h-full outline-none bg-transparent resize-none overflow-hidden py-1" rows={2} value={kr.selfComment || ''} onChange={e => updateKRSelf(i, k, 'selfComment', e.target.value)} placeholder="自评 (不能留空)..." />
@@ -774,9 +775,9 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
                                         </div>
                                         {showManagerColumn && (
                                             <div className="bg-orange-50 p-3 rounded border border-orange-200">
-                                                <div className="text-xs text-orange-400 mb-1">上级评分</div>
+                                                <div className="text-xs text-orange-400 mb-1">{isArchivedResult ? '上级评价' : '上级评分'}</div>
                                                 <div className="flex gap-2">
-                                                    <input type="number" disabled={!canGradeDetails && !canAdjustGrade} placeholder={isCrossStage ? "L1" : "0"} className={`w-14 p-1.5 border border-orange-300 rounded text-sm text-center focus:outline-none focus:border-orange-500 ${!canGradeDetails && !canAdjustGrade ? 'bg-slate-100 text-slate-500' : ''}`} value={kr.managerScore ?? ''} onChange={e => updateManagerScore(i, k, 'managerScore', Number(e.target.value))} />
+                                                    {!isArchivedResult && <input type="number" disabled={!canGradeDetails && !canAdjustGrade} placeholder={isCrossStage ? "L1" : "0"} className={`w-14 p-1.5 border border-orange-300 rounded text-sm text-center focus:outline-none focus:border-orange-500 ${!canGradeDetails && !canAdjustGrade ? 'bg-slate-100 text-slate-500' : ''}`} value={kr.managerScore ?? ''} onChange={e => updateManagerScore(i, k, 'managerScore', Number(e.target.value))} />}
                                                     <input disabled={!canGradeDetails && !canAdjustGrade} className={`flex-1 p-1.5 border border-orange-300 rounded text-sm focus:outline-none focus:border-orange-500 ${!canGradeDetails && !canAdjustGrade ? 'bg-slate-100 text-slate-500' : ''}`} placeholder="评价..." value={kr.managerComment || ''} onChange={e => updateManagerScore(i, k, 'managerComment', e.target.value)} />
                                                 </div>
                                             </div>
@@ -789,7 +790,7 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
                                     <div className="border border-blue-100 bg-blue-50/30 rounded p-3 h-full flex flex-col">
                                         <div className="flex justify-between items-center mb-2">
                                             <label className="text-xs font-bold text-blue-700">目标自评总结 (O{i + 1})</label>
-                                            <span className="text-sm font-bold text-blue-700">{obj.selfScore || 0} 分</span>
+                                            {!isArchivedResult && <span className="text-sm font-bold text-blue-700">{obj.selfScore || 0} 分</span>}
                                         </div>
                                         {canEditSelf ? (
                                             <textarea className="w-full p-2 text-sm border border-blue-200 rounded focus:ring-1 focus:ring-blue-500 outline-none flex-1 resize-y min-h-[3rem]" rows={3} placeholder="请对本目标的完成情况进行总结 (不能留空)..." value={obj.selfComment || ''} onChange={e => updateObjSelf(i, 'selfComment', e.target.value)} />
@@ -801,7 +802,7 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
                                         <div className="border border-orange-100 bg-orange-50/30 rounded p-3 h-full flex flex-col">
                                             <div className="flex justify-between items-center mb-2">
                                                 <label className="text-xs font-bold text-orange-700">上级目标评价 (O{i + 1})</label>
-                                                <span className="text-sm font-bold text-orange-700">{obj.managerScore || 0} 分</span>
+                                                {!isArchivedResult && <span className="text-sm font-bold text-orange-700">{obj.managerScore || 0} 分</span>}
                                             </div>
                                             {canGradeDetails || canAdjustGrade ? (
                                                 <textarea className="w-full p-2 text-sm border border-orange-200 rounded focus:ring-1 focus:ring-orange-500 outline-none flex-1 resize-y min-h-[3rem]" rows={3} placeholder="请对该目标的达成情况进行评价..." value={obj.managerComment || ''} onChange={e => updateManagerScore(i, null, 'managerComment', e.target.value)} />
@@ -818,15 +819,15 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
                     <div className="bg-blue-50 p-6 rounded-lg border border-blue-200 shadow-sm mt-4">
                         <h3 className="font-bold text-blue-900 mb-4 flex items-center gap-2"><UserCheck size={18} /> 员工整体自评</h3>
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                            <div className="lg:col-span-1 space-y-4">
+                            {!isArchivedResult && <div className="lg:col-span-1 space-y-4">
                                 <div className="bg-white p-4 rounded-lg border border-blue-100 shadow-sm text-center h-full flex flex-col justify-center">
                                     <div className="text-xs text-blue-500 uppercase font-bold mb-1">自评总分 (自动计算)</div>
                                     <div className="text-4xl font-extrabold text-blue-600">
                                         {selectedOKR.overallSelfAssessment?.score || 0}
                                     </div>
                                 </div>
-                            </div>
-                            <div className="lg:col-span-2">
+                            </div>}
+                            <div className={isArchivedResult ? "lg:col-span-3" : "lg:col-span-2"}>
                                 <label className="block text-sm font-medium text-blue-800 mb-2">个人自评总结</label>
                                 {canEditSelf ? (
                                     <textarea className="w-full p-3 border border-blue-200 rounded-lg min-h-[8rem] h-auto focus:ring-2 focus:ring-blue-500 outline-none" placeholder="请对本周期工作进行整体复盘和总结 (不能留空)..." value={selectedOKR.overallSelfAssessment?.comment || ''} onChange={e => updateOverallSelf('comment', e.target.value)} />
@@ -843,11 +844,15 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ okr: selectedOKR, onC
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                                 <div className="lg:col-span-1 space-y-4">
                                     <div className="bg-white p-4 rounded-lg border border-orange-100 shadow-sm text-center h-full flex flex-col justify-center">
-                                        <div className="text-xs text-orange-500 uppercase font-bold mb-1">最终得分</div>
-                                        <div className="text-4xl font-extrabold text-orange-600">
-                                            {managerTotalScore ?? '-'}
-                                        </div>
-                                        <div className="text-xs text-orange-500 uppercase font-bold mt-4 mb-1">最终定级</div>
+                                        {!isArchivedResult && (
+                                            <>
+                                                <div className="text-xs text-orange-500 uppercase font-bold mb-1">最终得分</div>
+                                                <div className="text-4xl font-extrabold text-orange-600">
+                                                    {managerTotalScore ?? '-'}
+                                                </div>
+                                            </>
+                                        )}
+                                        <div className={`text-xs text-orange-500 uppercase font-bold ${isArchivedResult ? 'mb-1' : 'mt-4 mb-1'}`}>最终定级</div>
                                         {canAdjustGrade ? (
                                             <select className={`text-4xl font-extrabold text-center bg-transparent outline-none w-full ${getGradeTextClass(selectedOKR.finalGrade)}`} value={selectedOKR.finalGrade || FinalGrade.PENDING} onChange={e => updateFinalGrade(e.target.value)}>
                                                 <option value={FinalGrade.PENDING}>待定</option>
