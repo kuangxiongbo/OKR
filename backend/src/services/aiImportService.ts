@@ -96,6 +96,12 @@ const supportsResponseFormatFallback = (error: unknown): boolean => {
   return /response[_ -]?format|json_object|structured output|unsupported/.test(responseText);
 };
 
+const supportsTemperatureFallback = (error: unknown): boolean => {
+  if (!axios.isAxiosError(error) || error.response?.status !== 400) return false;
+  const responseText = JSON.stringify(error.response.data || '').toLowerCase();
+  return /temperature[\s\S]*only\s*1\s*is\s*allowed|only\s*1\s*is\s*allowed[\s\S]*temperature/.test(responseText);
+};
+
 const formatAIRequestError = (error: unknown): Error => {
   if (axios.isAxiosError(error)) {
     if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
@@ -108,6 +114,9 @@ const formatAIRequestError = (error: unknown): Error => {
       ? responseData
       : responseData?.message || responseData?.error?.message || responseData?.error;
     if (status) {
+      if (status === 504) {
+        return new Error('AI 请求网关超时，Qwen 模型仍在处理，请稍后重试；如持续出现，请减少上传内容或检查中转站超时配置');
+      }
       return new Error(`AI 中转站请求失败（HTTP ${status}${detail ? `：${String(detail).slice(0, 300)}` : ''}）`);
     }
   }
@@ -199,30 +208,39 @@ export const parseOKRByAI = async (payload: ImportPayload): Promise<ParsedOKR> =
     },
     timeout: 120000
   };
-  const requestBody = {
-    model,
-    temperature: 0.2,
-    messages: [{ role: 'user', content }]
-  };
-
+  // qwen3.5-plus 对 temperature 仅允许 1，且部分版本携带 response_format
+  // 会长时间无响应；该模型由 safeJsonParse 负责提取 JSON。
+  let temperature = isQwen ? 1 : 0.2;
+  let includeResponseFormat = !isQwen;
   let resp;
-  try {
-    resp = await axios.post(
-      url,
-      {
-        ...requestBody,
-        response_format: { type: 'json_object' }
-      },
-      requestConfig
-    );
-  } catch (error) {
-    // 部分中转站实现了 Chat Completions，但未实现 response_format；去掉该字段重试。
-    if (!supportsResponseFormatFallback(error)) {
-      throw formatAIRequestError(error);
+
+  // 针对不同中转站/模型逐步降级参数，最多重试两次。
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      resp = await axios.post(
+        url,
+        {
+          model,
+          temperature,
+          messages: [{ role: 'user', content }],
+          ...(includeResponseFormat ? { response_format: { type: 'json_object' } } : {})
+        },
+        requestConfig
+      );
+      break;
+    } catch (error) {
+      const shouldRetryWithoutResponseFormat = includeResponseFormat && supportsResponseFormatFallback(error);
+      const shouldRetryWithSupportedTemperature = temperature !== 1 && supportsTemperatureFallback(error);
+      if (!shouldRetryWithoutResponseFormat && !shouldRetryWithSupportedTemperature) {
+        throw formatAIRequestError(error);
+      }
+      if (shouldRetryWithoutResponseFormat) includeResponseFormat = false;
+      if (shouldRetryWithSupportedTemperature) temperature = 1;
     }
-    resp = await axios.post(url, requestBody, requestConfig).catch((retryError) => {
-      throw formatAIRequestError(retryError);
-    });
+  }
+
+  if (!resp) {
+    throw new Error('AI 中转站请求失败：未收到有效响应');
   }
 
   const aiText = resp.data?.choices?.[0]?.message?.content || '';

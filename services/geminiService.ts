@@ -30,6 +30,7 @@ async function chatCompletions(
   temperature: number = DEFAULT_TEMPERATURE
 ) {
   const url = resolveChatCompletionsUrl(normalized.baseUrl);
+  const effectiveTemperature = normalized.model.toLowerCase().startsWith('qwen') ? 1 : temperature;
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -38,15 +39,27 @@ async function chatCompletions(
     headers.Authorization = `Bearer ${normalized.apiKey}`;
   }
 
-  const resp = await fetch(url, {
+  const request = (requestedTemperature: number) => fetch(url, {
     method: 'POST',
     headers,
     body: JSON.stringify({
       model: normalized.model,
-      temperature,
+      temperature: requestedTemperature,
       messages: [{ role: 'user', content: userContent }],
     }),
   });
+
+  let resp = await request(effectiveTemperature);
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => '');
+    const temperatureIsRestricted = resp.status === 400
+      && /temperature[\s\S]*only\s*1\s*is\s*allowed|only\s*1\s*is\s*allowed[\s\S]*temperature/i.test(text);
+    if (temperatureIsRestricted && effectiveTemperature !== 1) {
+      resp = await request(1);
+    } else {
+      throw new Error(`AI 请求失败: HTTP ${resp.status} ${text}`.trim());
+    }
+  }
 
   if (!resp.ok) {
     const text = await resp.text().catch(() => '');
