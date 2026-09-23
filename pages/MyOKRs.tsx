@@ -520,8 +520,13 @@ export const MyOKRs: React.FC = () => {
             OKRStatus.PENDING_ARCHIVE
         ];
 
-        const company = allOKRs.filter(o => activeStatuses.includes(o.status) && o.level === OKRLevel.COMPANY);
+        const company = allOKRs.filter(o =>
+            !o.isPerformanceArchived &&
+            activeStatuses.includes(o.status) &&
+            o.level === OKRLevel.COMPANY
+        );
         const dept = allOKRs.filter(o => 
+            !o.isPerformanceArchived &&
             activeStatuses.includes(o.status) &&
             o.level === OKRLevel.DEPARTMENT &&
             o.id !== localOKR.id

@@ -34,9 +34,15 @@ export const Dashboard: React.FC = () => {
     
     const refreshData = () => {
         let okrs = getOKRs();
+
+        // 已归档目标不进入公开看板；归档目标统一由评估归档页面查看。
+        okrs = okrs.filter(o =>
+            o.status !== OKRStatus.CLOSED &&
+            !o.isPerformanceArchived
+        );
         
         // Rule: Only Admin sees ALL statuses (Draft, Pending Creation, etc.)
-        // Regular users see Published/Grading/Closed/Assessment Pending
+        // Regular users see Published/Grading/Assessment Pending
         if (user.role !== Role.ADMIN) {
             okrs = okrs.filter(o => 
                 o.status === OKRStatus.PUBLISHED || 
@@ -44,8 +50,7 @@ export const Dashboard: React.FC = () => {
                 o.status === OKRStatus.PENDING_ASSESSMENT_APPROVAL ||
                 o.status === OKRStatus.PENDING_L2_APPROVAL ||
                 o.status === OKRStatus.PENDING_L3_APPROVAL ||
-                o.status === OKRStatus.PENDING_ARCHIVE ||
-                o.status === OKRStatus.CLOSED
+                o.status === OKRStatus.PENDING_ARCHIVE
             );
         }
         
