@@ -1573,7 +1573,7 @@ export const UserManagement: React.FC = () => {
 
                                     {tempAI.provider === 'LOCAL' ? (
                                         <>
-                                            <input className="w-full p-2 border rounded" placeholder="Base URL，如 http://localhost:11434/v1"
+                                            <input className="w-full p-2 border rounded" placeholder="Base URL，如 http://localhost:11434/v1（未填 /v1 会自动补全）"
                                                 value={tempAI.local?.baseUrl || ''} onChange={e => setTempAI({ ...tempAI, local: { ...(tempAI.local || { model: '' }), baseUrl: e.target.value } })} />
                                             <input className="w-full p-2 border rounded" placeholder="Model，如 qwen2.5-vl:7b"
                                                 value={tempAI.local?.model || ''} onChange={e => setTempAI({ ...tempAI, local: { ...(tempAI.local || { baseUrl: '' }), model: e.target.value } })} />

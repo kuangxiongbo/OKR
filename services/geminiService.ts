@@ -17,12 +17,19 @@ function normalizeAIConfig(aiConfig: AIConfig | null | undefined) {
   return { baseUrl, apiKey, model };
 }
 
+function resolveChatCompletionsUrl(baseUrl: string) {
+  const normalized = baseUrl.trim().replace(/\/+$/, '');
+  if (/\/chat\/completions$/i.test(normalized)) return normalized;
+  const versionedBaseUrl = /\/v\d+$/i.test(normalized) ? normalized : `${normalized}/v1`;
+  return `${versionedBaseUrl}/chat/completions`;
+}
+
 async function chatCompletions(
   normalized: { baseUrl: string; apiKey?: string; model: string },
   userContent: string,
   temperature: number = DEFAULT_TEMPERATURE
 ) {
-  const url = `${normalized.baseUrl.replace(/\/$/, '')}/chat/completions`;
+  const url = resolveChatCompletionsUrl(normalized.baseUrl);
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',

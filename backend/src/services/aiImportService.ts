@@ -44,6 +44,16 @@ JSON 结构如下:
 3) objectives 至少 1 个，每个 objective 至少 1 个 KR。
 4) 内容必须使用中文，表达精简准确。`;
 
+export const resolveChatCompletionsUrl = (baseUrl: string): string => {
+  const normalized = baseUrl.trim().replace(/\/+$/, '');
+  if (!normalized) return '';
+  if (/\/chat\/completions$/i.test(normalized)) return normalized;
+
+  // OpenAI 兼容服务通常把 API 挂在 /v1 下；允许用户填写根地址或带版本的 Base URL。
+  const versionedBaseUrl = /\/v\d+$/i.test(normalized) ? normalized : `${normalized}/v1`;
+  return `${versionedBaseUrl}/chat/completions`;
+};
+
 const safeJsonParse = (text: string): any => {
   const trimmed = text.trim();
   try {
@@ -78,6 +88,31 @@ const normalizeWeights = (okr: ParsedOKR): ParsedOKR => {
     period: okr.period || '',
     objectives
   };
+};
+
+const supportsResponseFormatFallback = (error: unknown): boolean => {
+  if (!axios.isAxiosError(error) || error.response?.status !== 400) return false;
+  const responseText = JSON.stringify(error.response.data || '').toLowerCase();
+  return /response[_ -]?format|json_object|structured output|unsupported/.test(responseText);
+};
+
+const formatAIRequestError = (error: unknown): Error => {
+  if (axios.isAxiosError(error)) {
+    if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
+      return new Error('AI 中转站请求超时（120 秒），请检查中转站地址、模型名称和模型服务状态');
+    }
+
+    const status = error.response?.status;
+    const responseData = error.response?.data;
+    const detail = typeof responseData === 'string'
+      ? responseData
+      : responseData?.message || responseData?.error?.message || responseData?.error;
+    if (status) {
+      return new Error(`AI 中转站请求失败（HTTP ${status}${detail ? `：${String(detail).slice(0, 300)}` : ''}）`);
+    }
+  }
+
+  return error instanceof Error ? error : new Error('AI 中转站请求失败');
 };
 
 export const getAIConfig = async (): Promise<AIConfig | null> => {
@@ -156,22 +191,39 @@ export const parseOKRByAI = async (payload: ImportPayload): Promise<ParsedOKR> =
     content.push({ type: 'image_url', image_url: { url: `data:${payload.mimeType || 'image/png'};base64,${payload.imageBase64}` } });
   }
 
-  const resp = await axios.post(
-    `${baseUrl.replace(/\/$/, '')}/chat/completions`,
-    {
-      model,
-      temperature: 0.2,
-      messages: [{ role: 'user', content }],
-      response_format: { type: 'json_object' }
+  const url = resolveChatCompletionsUrl(baseUrl);
+  const requestConfig = {
+    headers: {
+      'Content-Type': 'application/json',
+      ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {})
     },
-    {
-      headers: {
-        'Content-Type': 'application/json',
-        ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {})
+    timeout: 120000
+  };
+  const requestBody = {
+    model,
+    temperature: 0.2,
+    messages: [{ role: 'user', content }]
+  };
+
+  let resp;
+  try {
+    resp = await axios.post(
+      url,
+      {
+        ...requestBody,
+        response_format: { type: 'json_object' }
       },
-      timeout: 45000
+      requestConfig
+    );
+  } catch (error) {
+    // 部分中转站实现了 Chat Completions，但未实现 response_format；去掉该字段重试。
+    if (!supportsResponseFormatFallback(error)) {
+      throw formatAIRequestError(error);
     }
-  );
+    resp = await axios.post(url, requestBody, requestConfig).catch((retryError) => {
+      throw formatAIRequestError(retryError);
+    });
+  }
 
   const aiText = resp.data?.choices?.[0]?.message?.content || '';
   const parsed = safeJsonParse(String(aiText));
