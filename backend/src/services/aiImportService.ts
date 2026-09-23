@@ -60,8 +60,14 @@ const safeJsonParse = (text: string): any => {
     return JSON.parse(trimmed);
   } catch {
     const match = trimmed.match(/\{[\s\S]*\}/);
-    if (!match) throw new Error('AI 输出不是有效 JSON');
-    return JSON.parse(match[0]);
+    if (match) {
+      try {
+        return JSON.parse(match[0]);
+      } catch {
+        // Some models truncate a long JSON response at the token limit.
+      }
+    }
+    throw new Error('AI 输出不是有效 JSON，可能是模型返回内容不完整，请减少文档内容后重试');
   }
 };
 
@@ -105,7 +111,7 @@ const supportsTemperatureFallback = (error: unknown): boolean => {
 const formatAIRequestError = (error: unknown): Error => {
   if (axios.isAxiosError(error)) {
     if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
-      return new Error('AI 中转站请求超时（120 秒），请检查中转站地址、模型名称和模型服务状态');
+      return new Error('AI 中转站请求超时（150 秒），请检查中转站地址、模型名称和模型服务状态');
     }
 
     const status = error.response?.status;
@@ -191,7 +197,14 @@ export const parseOKRByAI = async (payload: ImportPayload): Promise<ParsedOKR> =
     }
   }
 
-  const content: any[] = [{ type: 'text', text: `${DEFAULT_PROMPT}\n文件名: ${payload.fileName || ''}\n文本内容:\n${extractedText}` }];
+  const isQwen35 = isQwen && /^qwen3\.5/i.test(model);
+  const qwenTextLimit = 4000;
+  const normalizedText = isQwen35 ? extractedText.slice(0, qwenTextLimit) : extractedText;
+  const textTruncated = isQwen35 && extractedText.length > normalizedText.length;
+  const content: any[] = [{
+    type: 'text',
+    text: `${DEFAULT_PROMPT}\n文件名: ${payload.fileName || ''}\n文本内容:\n${normalizedText}${textTruncated ? `\n\n（原文较长，已截取前 ${qwenTextLimit} 个字符用于识别）` : ''}`
+  }];
   if (payload.imageList && payload.imageList.length > 0) {
     payload.imageList.forEach((img) => {
       content.push({ type: 'image_url', image_url: { url: `data:${img.mimeType || 'image/png'};base64,${img.base64}` } });
@@ -206,7 +219,7 @@ export const parseOKRByAI = async (payload: ImportPayload): Promise<ParsedOKR> =
       'Content-Type': 'application/json',
       ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {})
     },
-    timeout: 120000
+    timeout: 150000
   };
   // qwen3.5-plus 对 temperature 仅允许 1，且部分版本携带 response_format
   // 会长时间无响应；该模型由 safeJsonParse 负责提取 JSON。
@@ -222,6 +235,7 @@ export const parseOKRByAI = async (payload: ImportPayload): Promise<ParsedOKR> =
         {
           model,
           temperature,
+          ...(isQwen35 ? { enable_thinking: false, max_tokens: 8192 } : {}),
           messages: [{ role: 'user', content }],
           ...(includeResponseFormat ? { response_format: { type: 'json_object' } } : {})
         },
